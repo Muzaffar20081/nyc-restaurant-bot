@@ -182,4 +182,3 @@ if __name__ == "__main__":
     print("Ресторанов:", len(restaurants))
     print("Бот запущен!")
     bot.infinity_polling()
-  
