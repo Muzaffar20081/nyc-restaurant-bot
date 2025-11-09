@@ -159,6 +159,7 @@ def help_cmd(message):
     bot.send_message(
         message.chat.id,
         "*Помощь:*\n"
+        '\n'
         "/start — начать\n"
         '\n'
         "/menu — список ресторанов\n"
@@ -185,6 +186,7 @@ if __name__ == "__main__":
     print("Ресторанов:", len(restaurants))
     print("Бот запущен!")
     bot.infinity_polling()
+
 
 
 
