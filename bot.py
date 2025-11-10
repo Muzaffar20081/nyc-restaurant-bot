@@ -1,76 +1,220 @@
 import os
-import json
 import telebot
 from telebot import types
 from dotenv import load_dotenv
+from database import load_restaurants, create_example_restaurant, add_restaurant
+from config import RESTAURANTS_FOLDER
 
+# Загружаем .env
 load_dotenv()
+
+# Токен бота
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-ADMIN_ID = 6056106251  # ← ТВОЙ ID
+# Админ ID (твой)
+ADMIN_ID = 6056106251  # ← ЗАМЕНИ НА СВОЙ ID
 
-# Читаем рестораны
-try:
-    with open("restaurants.json", "r", encoding="utf-8") as f:
-        restaurants = json.load(f)
-except:
-    restaurants = {}
+# Загружаем рестораны
+restaurants = load_restaurants()
 
+# --- КНОПКИ ---
+def main_menu():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_menu = types.KeyboardButton("/menu")
+    btn_help = types.KeyboardButton("/help")
+    btn_about = types.KeyboardButton("/about")
+    markup.add(btn_menu, btn_help, btn_about)
+    return markup
+
+def admin_menu():
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    btn_add = types.KeyboardButton("/add")
+    btn_back = types.KeyboardButton("/menu")
+    markup.add(btn_add, btn_back)
+    return markup
+
+# --- КОМАНДЫ ---
 @bot.message_handler(commands=['start'])
 def start(message):
+    user_id = message.from_user.id
     args = message.text.split()[1:] if len(message.text.split()) > 1 else []
     resto_id = args[0] if args else None
 
     if resto_id and resto_id in restaurants:
-        show_resto_menu(message.chat.id, resto_id)
+        # Переход по ссылке
+        resto = restaurants[resto_id]
+        text = f"*{resto['name']}*\n\n{resto['welcome']}"
+        markup = types.InlineKeyboardMarkup()
+        btn = types.InlineKeyboardButton("📋 Меню", callback_data=f"menu_{resto_id}")
+        markup.add(btn)
+        bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
     else:
-        if message.from_user.id == ADMIN_ID:
-            bot.send_message(message.chat.id, "Привет, *Админ!*\n\nРестораны в `restaurants.json`", parse_mode="Markdown")
-        else:
-            bot.send_message(message.chat.id, "Привет!\n\n/menu — посмотреть")
+        # Обычный /start
+        bot.send_message(
+            message.chat.id,
+            f"Привет, *{message.from_user.first_name}!*\n\n"
+            "Я — бот для ресторанов NYC 🍕\n"
+            "Нажми /menu, чтобы увидеть доступные заведения!",
+            parse_mode="Markdown",
+            reply_markup=main_menu()
+        )
 
 @bot.message_handler(commands=['menu'])
 def menu(message):
     if not restaurants:
-        bot.send_message(message.chat.id, "Рестораны не добавлены.")
+        bot.send_message(message.chat.id, "Рестораны пока не добавлены.", reply_markup=main_menu())
         return
+
     markup = types.InlineKeyboardMarkup(row_width=1)
     for rid, r in restaurants.items():
-        btn = types.InlineKeyboardButton(r['name'], callback_data=f"show_{rid}")
+        btn = types.InlineKeyboardButton(f"{r['name']}", callback_data=f"menu_{rid}")
         markup.add(btn)
     bot.send_message(message.chat.id, "Выбери ресторан:", reply_markup=markup)
 
-# --- ОБРАБОТКА НАЖАТИЯ НА КНОПКУ ---
-@bot.callback_query_handler(func=lambda call: call.data.startswith("show_"))
-def callback_show_menu(call):
-    rid = call.data.split("_")[1]
-    if rid not in restaurants:
+@bot.callback_query_handler(func=lambda call: call.data.startswith("menu_"))
+def show_menu(call):
+    resto_id = call.data.split("_")[1]
+    if resto_id not in restaurants:
         bot.answer_callback_query(call.id, "Ресторан не найден.")
         return
-    show_resto_menu(call.message.chat.id, rid, message_id=call.message.message_id)
 
-def show_resto_menu(chat_id, rid, message_id=None):
-    r = restaurants[rid]
-    text = f"*{r['name']}*\n\n{r['welcome']}\n\n"
-    for cat, items in r['categories'].items():
+    resto = restaurants[resto_id]
+    text = f"*{resto['name']}*\n\n"
+    for cat, items in resto['categories'].items():
         text += f"*{cat.upper()}*\n"
         for name, price in items:
             text += f"• {name} — ${price}\n"
         text += "\n"
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu"))
+    text += "Напиши /start, чтобы вернуться."
 
-    if message_id:
-        bot.edit_message_text(text, chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
+    bot.edit_message_text(
+        chat_id=call.message.chat.id,
+        message_id=call.message.message_id,
+        text=text,
+        parse_mode="Markdown"
+    )
+
+@bot.message_handler(commands=['add'])
+def add_resto(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.reply_to(message, "Только админ может добавлять рестораны!")
+        return
+
+    # Создаем пример ресторана если нужно
+    create_example_restaurant()
+    global restaurants
+    restaurants = load_restaurants()
+
+    msg = bot.send_message(message.chat.id, "Шаг 1: Введите ID ресторана (например, pizza_napoli):")
+    bot.register_next_step_handler(msg, process_id_step)
+
+def process_id_step(message):
+    resto_id = message.text.strip().lower()
+    if resto_id in restaurants:
+        bot.reply_to(message, "Такой ID уже есть!")
+        return
+    msg = bot.send_message(message.chat.id, "Шаг 2: Название ресторана:")
+    bot.register_next_step_handler(msg, process_name_step, resto_id)
+
+def process_name_step(message, resto_id):
+    name = message.text.strip()
+    msg = bot.send_message(message.chat.id, "Шаг 3: Приветствие (например, Добро пожаловать!):")
+    bot.register_next_step_handler(msg, process_welcome_step, resto_id, name)
+
+def process_welcome_step(message, resto_id, name):
+    welcome = message.text.strip()
+    msg = bot.send_message(
+        message.chat.id, 
+        "Шаг 4: Категории и блюда (формат: категория: блюдо $цена, блюдо $цена)\n\n"
+        "Пример:\n"
+        "пицца: Маргарита $16, Пепперони $18\n"
+        "напитки: Кола $3, Сок $4"
+    )
+    bot.register_next_step_handler(msg, process_categories_step, resto_id, name, welcome)
+
+def process_categories_step(message, resto_id, name, welcome):
+    text = message.text.strip()
+    categories = {}
+    
+    for line in text.split('\n'):
+        if ':' in line:
+            cat, items = line.split(':', 1)
+            cat = cat.strip().lower()
+            dishes = []
+            
+            # Разделяем блюда по запятой
+            for dish_item in items.split(','):
+                dish_item = dish_item.strip()
+                if '$' in dish_item:
+                    # Ищем последний $ для разделения названия и цены
+                    parts = dish_item.rsplit('$', 1)
+                    if len(parts) == 2:
+                        dish_name = parts[0].strip()
+                        price = parts[1].strip()
+                        dishes.append((dish_name, price))
+            
+            if dishes:
+                categories[cat] = dishes
+    
+    if not categories:
+        bot.reply_to(message, "Не распознал блюда! Попробуй ещё раз.")
+        return
+
+    add_restaurant(resto_id, name, welcome, categories)
+    global restaurants
+    restaurants = load_restaurants()
+
+    link = f"t.me/{bot.get_me().username}?start={resto_id}"
+    bot.send_message(
+        message.chat.id,
+        f"Ресторан *{name}* добавлен!\n\n"
+        f"Ссылка для клиентов:\n`{link}`",
+        parse_mode="Markdown",
+        reply_markup=admin_menu()
+    )
+
+@bot.message_handler(commands=['help'])
+def help_cmd(message):
+    bot.send_message(
+        message.chat.id,
+        "*Помощь:*\n\n"
+        "/start — начать\n\n"
+        "/menu — список ресторанов\n\n"
+        "/help — эта справка\n\n"
+        "/about — о боте",
+        parse_mode="Markdown",
+        reply_markup=main_menu()
+    )
+
+@bot.message_handler(commands=['about'])
+def about(message):
+    bot.send_message(
+        message.chat.id,
+        "Бот для ресторанов NYC\n"
+        "Создан для автоматизации заказов\n"
+        "Версия: 1.0",
+        reply_markup=main_menu()
+    )
+
+# Обработка обычных текстовых сообщений
+@bot.message_handler(func=lambda message: True)
+def handle_text(message):
+    if message.text == "/menu":
+        menu(message)
+    elif message.text == "/help":
+        help_cmd(message)
+    elif message.text == "/about":
+        about(message)
     else:
-        bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=markup)
+        bot.send_message(
+            message.chat.id,
+            "Не понимаю команду. Используй /help для справки.",
+            reply_markup=main_menu()
+        )
 
-@bot.callback_query_handler(func=lambda call: call.data == "back_to_menu")
-def back_to_menu(call):
-    bot.delete_message(call.message.chat.id, call.message.message_id)
-    menu(call.message)
-
+# --- ЗАПУСК ---
 if __name__ == "__main__":
-    print("Бот запущен! Ресторанов:", len(restaurants))
+    print("Ресторанов:", len(restaurants))
+    print("Бот запущен!")
     bot.infinity_polling()
