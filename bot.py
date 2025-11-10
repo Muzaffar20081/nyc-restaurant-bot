@@ -8,9 +8,14 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Читаем рестораны из файла
-with open("restaurants.json", "r", encoding="utf-8") as f:
-    restaurants = json.load(f)
+ADMIN_ID = 6056106251  # ← ТВОЙ ID
+
+# Читаем рестораны
+try:
+    with open("restaurants.json", "r", encoding="utf-8") as f:
+        restaurants = json.load(f)
+except:
+    restaurants = {}
 
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -25,12 +30,15 @@ def start(message):
         markup.add(btn)
         bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
     else:
-        bot.send_message(message.chat.id, "Привет!\n\n/menu — посмотреть рестораны")
+        if message.from_user.id == ADMIN_ID:
+            bot.send_message(message.chat.id, "Привет, *Админ!*\n\nДобавь ресторан в `restaurants.json`", parse_mode="Markdown")
+        else:
+            bot.send_message(message.chat.id, "Привет!\n\n/menu — посмотреть")
 
 @bot.message_handler(commands=['menu'])
 def menu(message):
     if not restaurants:
-        bot.send_message(message.chat.id, "Рестораны не добавлены.")
+        bot.send_message(message.chat.id, "Рестораны не добавлены. Админ, добавь в `restaurants.json`.")
         return
     markup = types.InlineKeyboardMarkup()
     for rid, r in restaurants.items():
