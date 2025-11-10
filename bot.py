@@ -5,17 +5,17 @@ from dotenv import load_dotenv
 from database import load_restaurants, add_restaurant
 from config import RESTAURANTS_FOLDER
 
-# Загрузка .env
+# Загружаем .env
 load_dotenv()
 
-# Токен
+# Токен бота
 BOT_TOKEN = os.getenv("BOT_TOKEN", "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE")
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# ТВОЙ ID (АДМИН)
+# ТВОЙ ID — ТОЛЬКО ТЫ МОЖЕШЬ ИСПОЛЬЗОВАТЬ /add
 ADMIN_ID = 6056106251   # ← ЗАМЕНИ НА СВОЙ ID (узнай через @userinfobot)
 
-# Загрузка ресторанов
+# Загружаем рестораны
 restaurants = load_restaurants()
 
 # --- КНОПКИ ---
@@ -25,13 +25,6 @@ def main_menu():
     markup.add(btn_menu)
     return markup
 
-def admin_menu():
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    btn_add = types.KeyboardButton("/add")
-    btn_menu = types.KeyboardButton("/menu")
-    markup.add(btn_add, btn_menu)
-    return markup
-
 # --- /start ---
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -39,7 +32,7 @@ def start(message):
     resto_id = args[0] if args else None
 
     if resto_id and resto_id in restaurants:
-        # Переход по ссылке
+        # Переход по ссылке t.me/твойбот?start=pizza_napoli
         r = restaurants[resto_id]
         text = f"*{r['name']}*\n\n{r['welcome']}"
         markup = types.InlineKeyboardMarkup()
@@ -47,21 +40,20 @@ def start(message):
         markup.add(btn)
         bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
     else:
-        # Обычный старт
+        # Обычный /start
         if message.from_user.id == ADMIN_ID:
             bot.send_message(
                 message.chat.id,
                 "Привет, *Админ!*\n\n"
-                "Добавь ресторан: /add\n"
-                "Посмотреть: /menu",
-                parse_mode="Markdown",
-                reply_markup=admin_menu()
+                "• /add — добавить ресторан\n"
+                "• /menu — посмотреть",
+                parse_mode="Markdown"
             )
         else:
             bot.send_message(
                 message.chat.id,
                 "Привет!\n\n"
-                "Доступные рестораны: /menu",
+                "Посмотри меню: /menu",
                 reply_markup=main_menu()
             )
 
@@ -78,6 +70,7 @@ def menu(message):
         markup.add(btn)
     bot.send_message(message.chat.id, "Выбери ресторан:", reply_markup=markup)
 
+# --- Показать меню ---
 @bot.callback_query_handler(func=lambda c: c.data.startswith("show_"))
 def show_menu(call):
     rid = call.data.split("_")[1]
@@ -96,7 +89,7 @@ def show_menu(call):
 @bot.message_handler(commands=['add'])
 def add_resto(message):
     if message.from_user.id != ADMIN_ID:
-        bot.reply_to(message, "Доступ запрещён.")
+        bot.reply_to(message, "Только админ может добавлять рестораны!")
         return
 
     msg = bot.send_message(message.chat.id, "ID ресторана (например, pizza_napoli):")
@@ -107,12 +100,12 @@ def step_id(message):
     if resto_id in restaurants:
         bot.reply_to(message, "Такой ID уже есть!")
         return
-    msg = bot.send_message(message.chat.id, "Название:")
+    msg = bot.send_message(message.chat.id, "Название ресторана:")
     bot.register_next_step_handler(msg, step_name, resto_id)
 
 def step_name(message, resto_id):
     name = message.text.strip()
-    msg = bot.send_message(message.chat.id, "Приветствие:")
+    msg = bot.send_message(message.chat.id, "Приветствие (например: Добро пожаловать!):")
     bot.register_next_step_handler(msg, step_welcome, resto_id, name)
 
 def step_welcome(message, resto_id, name):
@@ -136,7 +129,7 @@ def step_menu(message, resto_id, name, welcome):
                 categories[cat] = dishes
 
     if not categories:
-        bot.reply_to(message, "Не понял меню. Попробуй ещё.")
+        bot.reply_to(message, "Не понял меню. Попробуй ещё раз.")
         return
 
     add_restaurant(resto_id, name, welcome, categories)
@@ -148,8 +141,7 @@ def step_menu(message, resto_id, name, welcome):
         message.chat.id,
         f"Ресторан *{name}* добавлен!\n\n"
         f"Ссылка для клиентов:\n{link}",
-        parse_mode="Markdown",
-        reply_markup=admin_menu()
+        parse_mode="Markdown"
     )
 
 # --- Запуск ---
