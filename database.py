@@ -1,55 +1,57 @@
-# database.py
 import json
 import os
 from config import RESTAURANTS_FOLDER
 
-def load_restaurants():
-    restaurants = {}
+def ensure_restaurants_folder():
     if not os.path.exists(RESTAURANTS_FOLDER):
-        return restaurants
+        os.makedirs(RESTAURANTS_FOLDER)
+
+def load_restaurants():
+    ensure_restaurants_folder()
+    restaurants_file = os.path.join(RESTAURANTS_FOLDER, "restaurants.json")
     
-    for file in os.listdir(RESTAURANTS_FOLDER):
-        if file.endswith(".json"):
-            try:
-                with open(f"{RESTAURANTS_FOLDER}/{file}", "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    restaurants[data["id"]] = data
-            except Exception as e:
-                print(f"Ошибка загрузки {file}: {e}")
-    return restaurants
+    if not os.path.exists(restaurants_file):
+        return {}
+    
+    try:
+        with open(restaurants_file, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except (json.JSONDecodeError, FileNotFoundError):
+        return {}
+
+def save_restaurants(restaurants):
+    ensure_restaurants_folder()
+    restaurants_file = os.path.join(RESTAURANTS_FOLDER, "restaurants.json")
+    
+    with open(restaurants_file, 'w', encoding='utf-8') as f:
+        json.dump(restaurants, f, ensure_ascii=False, indent=2)
 
 def create_example_restaurant():
-    if not os.path.exists(RESTAURANTS_FOLDER):
-        os.makedirs(RESTAURANTS_FOLDER)
-    
-    example_file = f"{RESTAURANTS_FOLDER}/pizza_napoli.json"
-    if not os.path.exists(example_file):
-        example = {
-            "id": "pizza_napoli",
-            "name": "Pizza Napoli",
-            "welcome": "Добро пожаловать в Pizza Napoli! Лучшая пицца в Бруклине!",
-            "menu": {
-                "еда": ["Маргарита - $12", "Пепперони - $14", "4 сыра - $16"],
-                "напитки": ["Кола - $3", "Вода - $2", "Пиво - $6"],
-                "десерты": ["Тирамису - $8", "Мороженое - $5"]
+    restaurants = load_restaurants()
+    if "pizza_napoli" not in restaurants:
+        example_restaurant = {
+            "pizza_napoli": {
+                "name": "Pizza Napoli",
+                "welcome": "Добро пожаловать в лучшую пиццерию NYC!",
+                "categories": {
+                    "пицца": [
+                        ["Маргарита", "16"],
+                        ["Пепперони", "18"]
+                    ],
+                    "напитки": [
+                        ["Кола", "3"],
+                        ["Сок", "4"]
+                    ]
+                }
             }
         }
-        with open(example_file, "w", encoding="utf-8") as f:
-            json.dump(example, f, ensure_ascii=False, indent=4)
-        print(f"Создан пример: {example_file}")
+        save_restaurants(example_restaurant)
 
-
-
-def add_restaurant(restaurant_id, name, welcome, menu_dict):
-    if not os.path.exists(RESTAURANTS_FOLDER):
-        os.makedirs(RESTAURANTS_FOLDER)
-    file_path = f"{RESTAURANTS_FOLDER}/{restaurant_id}.json"
-    data = {
-        "id": restaurant_id,
+def add_restaurant(resto_id, name, welcome, categories):
+    restaurants = load_restaurants()
+    restaurants[resto_id] = {
         "name": name,
         "welcome": welcome,
-        "menu": menu_dict
+        "categories": categories
     }
-    with open(file_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
-    print(f"Ресторан добавлен: {name}")
+    save_restaurants(restaurants)
