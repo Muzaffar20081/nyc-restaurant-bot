@@ -23,33 +23,34 @@ def start(message):
     resto_id = args[0] if args else None
 
     if resto_id and resto_id in restaurants:
-        r = restaurants[resto_id]
-        text = f"*{r['name']}*\n\n{r['welcome']}"
-        markup = types.InlineKeyboardMarkup()
-        btn = types.InlineKeyboardButton("Меню", callback_data=f"show_{resto_id}")
-        markup.add(btn)
-        bot.send_message(message.chat.id, text, parse_mode="Markdown", reply_markup=markup)
+        show_resto_menu(message.chat.id, resto_id)
     else:
         if message.from_user.id == ADMIN_ID:
-            bot.send_message(message.chat.id, "Привет, *Админ!*\n\nДобавь ресторан в `restaurants.json`", parse_mode="Markdown")
+            bot.send_message(message.chat.id, "Привет, *Админ!*\n\nРестораны в `restaurants.json`", parse_mode="Markdown")
         else:
             bot.send_message(message.chat.id, "Привет!\n\n/menu — посмотреть")
 
 @bot.message_handler(commands=['menu'])
 def menu(message):
     if not restaurants:
-        bot.send_message(message.chat.id, "Рестораны не добавлены. Админ, добавь в `restaurants.json`.")
+        bot.send_message(message.chat.id, "Рестораны не добавлены.")
         return
-    markup = types.InlineKeyboardMarkup()
+    markup = types.InlineKeyboardMarkup(row_width=1)
     for rid, r in restaurants.items():
         btn = types.InlineKeyboardButton(r['name'], callback_data=f"show_{rid}")
         markup.add(btn)
-    bot.send_message(message.chat.id, "Выбери:", reply_markup=markup)
+    bot.send_message(message.chat.id, "Выбери ресторан:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda c: c.data.startswith("show_"))
-def show_menu(call):
+# --- ОБРАБОТКА НАЖАТИЯ НА КНОПКУ ---
+@bot.callback_query_handler(func=lambda call: call.data.startswith("show_"))
+def callback_show_menu(call):
     rid = call.data.split("_")[1]
-    if rid not in restaurants: return
+    if rid not in restaurants:
+        bot.answer_callback_query(call.id, "Ресторан не найден.")
+        return
+    show_resto_menu(call.message.chat.id, rid, message_id=call.message.message_id)
+
+def show_resto_menu(chat_id, rid, message_id=None):
     r = restaurants[rid]
     text = f"*{r['name']}*\n\n{r['welcome']}\n\n"
     for cat, items in r['categories'].items():
@@ -57,7 +58,18 @@ def show_menu(call):
         for name, price in items:
             text += f"• {name} — ${price}\n"
         text += "\n"
-    bot.edit_message_text(text, call.message.chat.id, call.message.message_id, parse_mode="Markdown")
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_menu"))
+
+    if message_id:
+        bot.edit_message_text(text, chat_id, message_id, parse_mode="Markdown", reply_markup=markup)
+    else:
+        bot.send_message(chat_id, text, parse_mode="Markdown", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "back_to_menu")
+def back_to_menu(call):
+    bot.delete_message(call.message.chat.id, call.message.message_id)
+    menu(call.message)
 
 if __name__ == "__main__":
     print("Бот запущен! Ресторанов:", len(restaurants))
