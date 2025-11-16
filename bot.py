@@ -46,15 +46,9 @@ def get_dish_kb():
 # === КОМАНДЫ ===
 @dp.message(Command("start"))
 async def start(message: Message):
-    if not DATA:
-        await message.answer("Меню пустое.")
-        return
-    rest = DATA[0]
     await message.answer(
         f"🍔 *Привет, {message.from_user.first_name}!*\n\n"
-        f"Добро пожаловать в *{rest['name']}*!\n"
-        "Вот наше меню:",
-        reply_markup=get_menu_kb(),
+        "Добро пожаловать в *Burger King*!",
         parse_mode="Markdown"
     )
 
@@ -69,7 +63,6 @@ async def menu_command(message: Message):
         reply_markup=get_menu_kb(),
         parse_mode="Markdown"
     )
-
 @dp.message(Command("help"))
 async def help_command(message: Message):
     await message.answer(
