@@ -29,6 +29,47 @@
           "photo": "data/sushi_philadelphia.jpg"
         }
       ]
+    },{
+  "restaurants": [
+    {
+      "name": "Burger King",
+      "emoji": "🍔",
+      "menu": [
+        {
+          "name": "Воппер",
+          "price": 399,
+          "description": "Сочная говядина, овощи, соус",
+          "photo": "data/whopper.jpg"
+        },
+        {
+          "name": "Чикенбургер",
+          "price": 250,
+          "description": "Курица в хрустящей панировке",
+          "photo": "data/chicken.jpg"
+        },
+        {
+          "name": "Картошка фри",
+          "price": 120,
+          "description": "Хрустящая, золотистая",
+          "photo": "data/fries.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Пицца Хат",
+      "emoji": "🍕",
+      "menu": [
+        {
+          "name": "Маргарита",
+          "price": 450,
+          "description": "Томатный соус, моцарелла, базилик",
+          "photo": "data/pizza_margherita.jpg"
+        }
+      ]
     }
   ]
+}
+    
+  ]
+  
 }
