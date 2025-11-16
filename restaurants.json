@@ -1,0 +1,34 @@
+{
+  "restaurants": [
+    {
+      "name": "Пицца Хат",
+      "emoji": "🍕",
+      "menu": [
+        {
+          "name": "Маргарита",
+          "price": 450,
+          "description": "Томатный соус, моцарелла, базилик",
+          "photo": "data/pizza_margherita.jpg"
+        },
+        {
+          "name": "Пепперони",
+          "price": 550,
+          "description": "Пепперони, сыр, соус",
+          "photo": "data/pizza_pepperoni.jpg"
+        }
+      ]
+    },
+    {
+      "name": "Суши Бар",
+      "emoji": "🍣",
+      "menu": [
+        {
+          "name": "Филадельфия",
+          "price": 680,
+          "description": "Лосось, сыр, авокадо",
+          "photo": "data/sushi_philadelphia.jpg"
+        }
+      ]
+    }
+  ]
+}
