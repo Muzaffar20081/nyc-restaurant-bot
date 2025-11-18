@@ -47,20 +47,22 @@ def get_dish_kb():
 @dp.message(Command("start"))
 async def start(message: Message):
     await message.answer(
-        f"🍔 *Привет, {message.from_user.first_name}!*\n\n"
-        "Добро пожаловать в *Burger King*!",
-        '  \n\n чтобы сделать заказ' ,
+        f"Привет, {message.from_user.first_name}!\n\n"
+        "Добро пожаловать в *Burger King*!\n\n"
+        "Чтобы открыть меню — нажми /menu",
         parse_mode="Markdown"
     )
 
 @dp.message(Command("menu"))
 async def menu_command(message: Message):
-    if not DATA:
-        await message.answer("Меню пустое.")
+    if not DATA or not DATA[0]["menu"]:
+        await message.answer("Меню временно недоступно.")
         return
+    
     rest = DATA[0]
     await message.answer(
-        f"🍔 *{rest['name']} — Полное меню:*",
+        f"*Burger King — Полное меню:*\n\n"
+        "Выберите блюдо:",
         reply_markup=get_menu_kb(),
         parse_mode="Markdown"
     )
@@ -124,4 +126,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
