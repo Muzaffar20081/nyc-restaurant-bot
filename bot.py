@@ -1,4 +1,4 @@
-# bot.py — УМНЫЙ BURGER KING БОТ НА GROK (работает 100%)
+# bot.py — УМНЫЙ BURGER KING БОТ НА GROK (исправленный синтаксис)
 import asyncio
 import json
 import logging
@@ -7,14 +7,9 @@ import httpx
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.filters import Command
+from config import BOT_TOKEN
 
-# Логи
 logging.basicConfig(level=logging.INFO)
-
-# Токен бота и ключ Grok
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GROK_API_KEY = os.getenv("GROK_API_KEY")
-
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -22,7 +17,8 @@ dp = Dispatcher()
 with open("restaurants.json", "r", encoding="utf-8") as f:
     DATA = json.load(f)["restaurants"][0]
 
-# Клавиатура меню
+GROK_API_KEY = os.getenv("GROK_API_KEY")
+
 def get_menu_kb():
     kb = [
         [InlineKeyboardButton(text=f"{d['name']} — {d['price']} ₽", callback_data=f"dish_{i}")]
@@ -31,7 +27,6 @@ def get_menu_kb():
     kb.append([InlineKeyboardButton(text="Назад в меню", callback_data="menu")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
-# Запрос к Grok (РАБОЧИЙ URL 2025!)
 async def ask_grok(text: str) -> str:
     if not GROK_API_KEY:
         return "API ключ не найден 😅"
@@ -63,11 +58,11 @@ async def ask_grok(text: str) -> str:
 @dp.message(Command("start"))
 async def start(message: Message):
     await message.answer(
-"f"Привет, {message.from_user.first_name}!\n\n"
-"Это *Burger King* 🔥\n"
-"• /menu — всё меню\n"
-"• Просто пиши — я отвечу как живой сотрудник\n\n"
-"Го закажем вкусняшку?",
+        f"Привет, {message.from_user.first_name}!\n\n"
+        "Это *Burger King* 🔥\n"
+        "• /menu — всё меню\n"
+        "• Просто пиши — я отвечу как живой сотрудник\n\n"
+        "Го закажем вкусняшку?",
         parse_mode="Markdown"
     )
 
