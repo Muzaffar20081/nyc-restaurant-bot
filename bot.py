@@ -1,15 +1,19 @@
-# bot.py — УМНЫЙ BURGER KING БОТ НА GROK (исправленный синтаксис)
 import asyncio
 import json
 import logging
 import os
 import httpx
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
-from config import BOT_TOKEN
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import F
 
 logging.basicConfig(level=logging.INFO)
+
+# Токены из переменных окружения
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+GROK_API_KEY = os.getenv("GROK_API_KEY")
+
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
@@ -17,90 +21,95 @@ dp = Dispatcher()
 with open("restaurants.json", "r", encoding="utf-8") as f:
     DATA = json.load(f)["restaurants"][0]
 
-GROK_API_KEY = os.getenv("GROK_API_KEY")
-
-def get_menu_kb():
-    kb = [
-        [InlineKeyboardButton(text=f"{d['name']} — {d['price']} ₽", callback_data=f"dish_{i}")]
-        for i, d in enumerate(DATA["menu"])
-    ]
-    kb.append([InlineKeyboardButton(text="Назад в меню", callback_data="menu")])
+# Клавиатура меню
+def menu_kb():
+    kb = []
+    for i, dish in enumerate(DATA["menu"]):
+        kb.append([InlineKeyboardButton(
+            text=f"{dish['name']} — {dish['price']}₽",
+            callback_data=f"dish_{i}"
+        )])
+    kb.append([InlineKeyboardButton(text="Назад", callback_data="back")])
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
+# Запрос к Grok
 async def ask_grok(text: str) -> str:
     if not GROK_API_KEY:
-        return "API ключ не найден 😅"
+        return "Ошибка: ключ Grok не найден"
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         try:
-            resp = await client.post(
+            r = await client.post(
                 "https://api.grok.xai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {GROK_API_KEY}"},
                 json={
                     "model": "grok-beta",
                     "messages": [
-                        {"role": "system", "content": "Ты — весёлый и дерзкий сотрудник Burger King в России. Отвечай коротко, по-русски, с юмором."},
+                        {"role": "system", "content": "Ты весёлый сотрудник Burger King в России. Отвечай коротко и по-русски с юмором."},
                         {"role": "user", "content": text}
                     ],
-                    "temperature": 0.9,
-                    "max_tokens": 300
+                    "temperature": 0.9
                 }
             )
-            if resp.status_code == 200:
-                return resp.json()["choices"][0]["message"]["content"].strip()
+            if r.status_code == 200:
+                return r.json()["choices"][0]["message"]["content"]
             else:
-                return f"Грок приуныл 😓 (код {resp.status_code})"
+                return f"Грок спит… код {r.status_code}"
         except Exception as e:
             logging.error(f"Grok error: {e}")
-            return "Я щас немного торможу… Спроси ещё разок!"
+            return "Я чуть торможу, попробуй ещё разок"
 
-# Команды
+# /start
 @dp.message(Command("start"))
-async def start(message: Message):
+async def start(message: types.Message):
     await message.answer(
         f"Привет, {message.from_user.first_name}!\n\n"
-        "Это *Burger King* 🔥\n"
-        "• /menu — всё меню\n"
-        "• Просто пиши — я отвечу как живой сотрудник\n\n"
-        "Го закажем вкусняшку?",
+        "Добро пожаловать в Burger King\n"
+        "• /menu — посмотреть меню\n"
+        "• Просто пиши мне — я отвечу как живой сотрудник",
         parse_mode="Markdown"
     )
 
+# /menu
 @dp.message(Command("menu"))
-async def menu_cmd(message: Message):
-    await message.answer("Выбери что-нибудь вкусное:", reply_markup=get_menu_kb())
+async def menu_cmd(message: types.Message):
+    await message.answer("Выбирай вкусняшку:", reply_markup=menu_kb())
 
-# Обычный чат — отправляем в Grok
+# Любой текст → Grok
 @dp.message()
-async def chat(message: Message):
+async def text_handler(message: types.Message):
     if message.text and not message.text.startswith("/"):
         answer = await ask_grok(message.text)
         await message.answer(answer)
 
-# Выбор блюда
+# Клик по блюду
 @dp.callback_query(F.data.startswith("dish_"))
-async def show_dish(call: CallbackQuery):
+async def show_dish(call: types.CallbackQuery):
     idx = int(call.data.split("_")[1])
     dish = DATA["menu"][idx]
-    text = f"*{dish['name']}*\n\n{dish['description']}\n\nЦена: {dish['price']} ₽"
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Добавить в корзину", callback_data=f"add_{idx}")],
-        [InlineKeyboardButton(text="Назад", callback_data="menu")]
+        [InlineKeyboardButton(text="В корзину", callback_data=f"add_{idx}")],
+        [InlineKeyboardButton(text="Назад", callback_data="back")]
     ])
-    await call.message.edit_text(text, reply_markup=kb, parse_mode="Markdown")
+    await call.message.edit_text(
+        f"*{dish['name']}*\n\n{dish['description']}\n\nЦена: {dish['price']}₽",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
 
-@dp.callback_query(F.data == "menu")
-async def back_to_menu(call: CallbackQuery):
-    await call.message.edit_text("Выбери что-нибудь вкусное:", reply_markup=get_menu_kb())
+# Назад в меню
+@dp.callback_query(F.data == "back")
+async def back(call: types.CallbackQuery):
+    await call.message.edit_text("Выбирай вкусняшку:", reply_markup=menu_kb())
 
+# Добавлено в корзину
 @dp.callback_query(F.data.startswith("add_"))
-async def add_to_cart(call: CallbackQuery):
+async def added(call: types.CallbackQuery):
     await call.answer("Добавлено в корзину!", show_alert=True)
-    await call.message.edit_reply_markup(reply_markup=None)
-    await call.message.answer("Скоро добавлю полноценную корзину с оплатой 😉")
 
+# Запуск
 async def main():
-    logging.info("БОТ ЗАПУЩЕН НА GROK!")
+    logging.info("Бот запущен на Grok!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
