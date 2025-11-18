@@ -49,6 +49,7 @@ async def start(message: Message):
     await message.answer(
         f"🍔 *Привет, {message.from_user.first_name}!*\n\n"
         "Добро пожаловать в *Burger King*!",
+        '  \n\n чтобы сделать заказ' ,
         parse_mode="Markdown"
     )
 
@@ -123,3 +124,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
