@@ -153,46 +153,60 @@ def add_to_cart(user_id, text):
 async def cmd_start(message: types.Message):
     try:
         logging.info(f"Start command received from {message.from_user.id}")
-        await message.answer_photo(
-            photo="https://via.placeholder.com/400x200/FF6B00/FFFFFF?text=Burger+King+2025",
-            caption=f"Здарова, {message.from_user.first_name}!\n\n"
-                    "*Добро пожаловать в Burger King нового уровня!*\n\n"
-                    "Просто пиши мне как живому сотруднику:\n"
-                    "«Два воппера и колу»\n"
-                    "«Сколько с меня?»\n"
-                    "«Дай меню»\n\n"
-                    "Я всё пойму сам!",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
-            ])
+        
+        # Создаем простую клавиатуру для старта
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
+        ])
+        
+        # Отправляем текстовое сообщение вместо фото (на случай если фото не грузится)
+        await message.answer(
+            f"Здарова, {message.from_user.first_name}!\n\n"
+            "*Добро пожаловать в Burger King нового уровня!*\n\n"
+            "Просто пиши мне как живому сотруднику:\n"
+            "«Два воппера и колу»\n"
+            "«Сколько с меня?»\n"
+            "«Дай меню»\n\n"
+            "Я всё пойму сам!",
+            reply_markup=keyboard
         )
+        
         logging.info("Start command executed successfully")
+        
     except Exception as e:
         logging.error(f"Error in cmd_start: {e}")
-        await message.answer("Произошла ошибка, попробуйте позже")
+        # Альтернативный вариант без клавиатуры
+        await message.answer(
+            f"Привет, {message.from_user.first_name}! Добро пожаловать в Burger King! "
+            "Используй команды: /menu - меню, /cart - корзина"
+        )
 
 # Команда /menu
 @dp.message(Command("menu"))
 async def cmd_menu(message: types.Message):
-    await message.answer(
-        BEAUTIFUL_MENU,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+    try:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
             [InlineKeyboardButton(text="❌ Очистить корзину", callback_data="clear")]
         ])
-    )
+        await message.answer(BEAUTIFUL_MENU, reply_markup=keyboard)
+    except Exception as e:
+        logging.error(f"Error in cmd_menu: {e}")
+        await message.answer(BEAUTIFUL_MENU)
 
 # Команда /cart
 @dp.message(Command("cart"))
 async def cmd_cart(message: types.Message):
-    await message.answer(
-        get_cart(message.from_user.id),
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+    try:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
             [InlineKeyboardButton(text="❌ Очистить корзину", callback_data="clear")]
         ])
-    )
+        await message.answer(get_cart(message.from_user.id), reply_markup=keyboard)
+    except Exception as e:
+        logging.error(f"Error in cmd_cart: {e}")
+        await message.answer(get_cart(message.from_user.id))
 
 # Кнопка Меню
 @dp.callback_query(lambda c: c.data == "menu")
