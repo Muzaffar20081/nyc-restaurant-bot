@@ -1,4 +1,4 @@
-# bot.py — САМЫЙ КРУТОЙ BURGER KING БОТ В РОССИИ 2025
+# bot.py — ФИНАЛЬНЫЙ ВАРИАНТ С ОТДЕЛЬНЫМ menu.py
 import asyncio
 import os
 import httpx
@@ -6,7 +6,7 @@ from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from menu import BEAUTIFUL_MENU   # ← твоё эпичное меню
+from menu import BEAUTIFUL_MENU   # ← ВОЗВРАЩАЕМ КРАСОТУ
 
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
@@ -14,110 +14,92 @@ dp = Dispatcher()
 GROK_API_KEY = os.getenv("GROK_API_KEY")
 user_cart = defaultdict(list)
 
-# ВСЕ ЦЕНЫ ИЗ ТВОЕГО НОВОГО МЕНЮ
+# цены оставляем тут
 PRICES = {
     "воппер": 349, "двойной воппер": 449, "чизбургер": 149, "двойной чизбургер": 229,
     "биг кинг": 399, "воппер сырный": 379, "беконайзер": 299, "лонг чикен": 279,
-    "картошка фри": 149, "картошка по-деревенски": 169, "наггетсы": 259, "наггетсы 16": 399,
-    "луковые кольца": 189, "сырные палочки": 229,
-    "кола": 119, "кола 1л": 179, "фанта": 119, "спрайт": 119, "молочный коктейль": 199,
-    "ледяной чай": 149, "кофе": 129,
+    "картошка": 149, "картошка по-деревенски": 169, "наггетсы": 259, "наггетсы 16шт": 399,
+    "луковые кольца": 189, "сырные палочки": 229, "кола": 119, "кола 1л": 179,
+    "фанта": 119, "спрайт": 119, "коктейль": 199, "ледяной чай": 149, "кофе": 129,
     "мороженое": 99, "чизкейк": 159, "яблочный пирог": 139, "маффин": 119,
-    "кетчуп": 49, "сырный соус": 49, "чесночный соус": 49, "барбекю": 49, "карри": 49
+    "соус": 49, "кетчуп": 49, "сырный соус": 49, "чесночный соус": 49, 
+    "соус барбекю": 49, "соус карри": 49
 }
 
 def get_cart(uid):
-    if not user_cart[uid]: return "*Корзина пустая, брат!*"
-    total = sum(i["price"] * i["qty"] for i in user_cart[uid])
-    text = "*Твоя корзина:*\n\n"
+    if not user_cart[uid]: return "*Корзина пустая*"
+    total = sum(i["price"]*i["qty"] for i in user_cart[uid])
+    txt = "*Твоя корзина:*\n\n"
     for i in user_cart[uid]:
-        text += f"• {i['name'].title()} × {i['qty']} = {i['price']*i['qty']}₽\n"
-    text += f"\n*Итого: {total}₽*"
-    return text
+        txt += f"• {i['name'].title()} × {i['qty']} = {i['price']*i['qty']}₽\n"
+    txt += f"\n*Итого: {total}₽*"
+    return txt
 
-async def grok_answer(text, cart):
-    prompt = f"""Ты — дерзкий сотрудник Burger King. Отвечай коротко, по-пацански, с матом можно.
-Меню:\n{BEAUTIFUL_MENU}\nКорзина: {cart}\nКлиент написал: "{text}"
-Просто отвечай как живой человек."""
+async def grok(text, cart):
+    prompt = f"Меню:\n{BEAUTIFUL_MENU}\nКорзина: {cart}\nКлиент написал: {text}\nОтветь коротко и дерзко, по-пацански"
     try:
         async with httpx.AsyncClient(timeout=20) as c:
             r = await c.post("https://api.x.ai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                json={"model":"grok-2-latest","messages":[{"role":"user","content":prompt}],"temperature":0.95})
+                headers={"Authorization": f"Bearer {GROK_API_KEY}"},  # ← ИСПРАВЛЕНО!
+                json={"model":"grok-2-latest","messages":[{"role":"user","content":prompt}],"temperature":0.9})
             if r.status_code == 200:
                 return r.json()["choices"][0]["message"]["content"].strip()
-    except: pass
-    return "Сек, брат, ща всё будет!"
+    except Exception as e:
+        print(f"Grok error: {e}")
+    return "Ща всё будет, брат"
 
-def add_to_cart(uid, text):
+def add_to_cart(text, user_id):
     text = text.lower()
-    added = []
-    for name, price in PRICES.items():
-        if name in text or any(word in text for word in name.split()):
-            found = False
-            for item in user_cart[uid]:
+    for name in PRICES:
+        if name in text:
+            for item in user_cart[user_id]:
                 if item["name"] == name:
                     item["qty"] += 1
-                    found = True
-                    break
-            if not found:
-                user_cart[uid].append({"name": name, "price": price, "qty": 1})
-            added.append(name.title())
-    return added
+                    return name.title()
+            user_cart[user_id].append({"name": name, "price": PRICES[name], "qty": 1})
+            return name.title()
+    return None
 
 @dp.message(CommandStart())
-async def start(message: types.Message):
-    await message.answer(
-        "Здарова, брат!\n\n/start работает на 1000%\n\nЩа перезапущу картинку и меню...",
+async def start(m: types.Message):
+    await m.answer_photo(
+        "https://i.ibb.co/m9kJ7B/welcome-burger.png",
+        caption=f"Здарова, {m.from_user.first_name}!\n\n*Burger King на максималках*\nПиши что хочешь — я всё сделаю!",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Меню", callback_data="menu")],
-            [InlineKeyboardButton(text="Корзина", callback_data="cart")]
-        ])
-    )
-    # Через секунду отправляем картинку отдельным сообщением — так точно не падает
-    await asyncio.sleep(1)
-    await message.answer_photo(
-        photo="https://i.ibb.co/m9kJ7B/welcome-burger.png",
-        caption=f"Здарова, {message.from_user.first_name}!\n\n*BURGER KING — ТВОЯ КОМАНДА ВКУСА*\n\nПиши что угодно — я всё пойму!",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Меню", callback_data="menu")],
-            [InlineKeyboardButton(text="Корзина", callback_data="cart")]
-        ])
-    )
+            [InlineKeyboardButton(text="Меню", callback_data="m")],
+            [InlineKeyboardButton(text="Корзина", callback_data="c")]
+        ]))
 
-@dp.callback_query(lambda c: c.data == "menu")
+@dp.callback_query(lambda c: c.data == "m")
 async def menu(c: types.CallbackQuery):
     await c.message.edit_caption(caption=BEAUTIFUL_MENU,
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Корзина", callback_data="cart")]]))
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Корзина", callback_data="c")]]))
 
-@dp.callback_query(lambda c: c.data == "cart")
+@dp.callback_query(lambda c: c.data == "c")
 async def cart(c: types.CallbackQuery):
     await c.message.edit_caption(caption=get_cart(c.from_user.id),
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Очистить корзину", callback_data="clear")],
-            [InlineKeyboardButton(text="Меню", callback_data="menu")]
+            [InlineKeyboardButton(text="Очистить", callback_data="clear")],
+            [InlineKeyboardButton(text="Меню", callback_data="m")]
         ]))
 
 @dp.callback_query(lambda c: c.data == "clear")
-async def clear(c: types.CallbackQuery):
+async def clr(c: types.CallbackQuery):
     user_cart[c.from_user.id].clear()
-    await c.answer("Корзина очищена!", show_alert=True)
+    await c.answer("Очищено!", show_alert=True)
     await cart(c)
 
 @dp.message()
 async def msg(m: types.Message):
-    if not m.text: return
-    added = add_to_cart(m.from_user.id, m.text)
+    added = add_to_cart(m.text or "", m.from_user.id)
     if added:
-        await m.answer(f"Закинул в корзину: {', '.join(added)}!\n\n{get_cart(m.from_user.id)}")
+        await m.answer(f"Закинул {added}!\n\n{get_cart(m.from_user.id)}")
     else:
-        ans = await grok_answer(m.text, get_cart(m.from_user.id))
+        ans = await grok(m.text or "", get_cart(m.from_user.id))
         await m.answer(ans)
 
 async def main():
-    print("ЗАПУЩЕН САМЫЙ КРУТОЙ BURGER KING БОТ 2025")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
     asyncio.run(main())
-
