@@ -66,16 +66,19 @@ def add_to_cart(uid, text):
     return added
 
 @dp.message(CommandStart())
-async def start(m: types.Message):
-    await m.answer_photo(
-        "https://i.ibb.co/m9kJ7B/welcome-burger.png",
-        caption=f"Здарова, {m.from_user.first_name}!\n\n"
-                "*BURGER KING — ТВОЯ КОМАНДА ВКУСА*\n\n"
-                "Пиши что угодно — я пойму и закину в корзину!\n"
-                "Примеры:\n"
-                "• Два воппера и большую колу\n"
-                "• Наггетсы 16 и сырные палочки\n"
-                "• Сколько с меня?",
+async def start(message: types.Message):
+    await message.answer(
+        "Здарова, брат!\n\n/start работает на 1000%\n\nЩа перезапущу картинку и меню...",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="Корзина", callback_data="cart")]
+        ])
+    )
+    # Через секунду отправляем картинку отдельным сообщением — так точно не падает
+    await asyncio.sleep(1)
+    await message.answer_photo(
+        photo="https://i.ibb.co/m9kJ7B/welcome-burger.png",
+        caption=f"Здарова, {message.from_user.first_name}!\n\n*BURGER KING — ТВОЯ КОМАНДА ВКУСА*\n\nПиши что угодно — я всё пойму!",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="Меню", callback_data="menu")],
             [InlineKeyboardButton(text="Корзина", callback_data="cart")]
@@ -117,3 +120,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
