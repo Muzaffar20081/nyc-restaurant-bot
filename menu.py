@@ -1,18 +1,3 @@
-# bot.py - ФИНАЛЬНЫЙ БОТ С GROK AI
-import os
-import json
-import httpx
-from collections import defaultdict
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
-bot = Bot(token=os.getenv("BOT_TOKEN"))
-dp = Dispatcher()
-
-user_cart = defaultdict(list)
-
-# Меню из твоего menu.py
 BURGER_KING_MENU = """
 *BURGER KING - ТВОЯ КОМАНДА ВКУСА*
 
@@ -56,4 +41,19 @@ BURGER_KING_MENU = """
 Барбекю — 49₽
 Карри — 49₽
 
-*ПИШИ ЧТО Х
+*ПИШИ ЧТО ХОЧЕШЬ - СДЕЛАЕМ БЫСТРО И ЧИСТО!*
+"""
+
+# Цены для корзины
+PRICES = {
+    "Воппер": 349, "Двойной Воппер": 449, "Чизбургер": 149,
+    "Двойной Чизбургер": 229, "Биг Кинг": 399, "Воппер Сырный": 379,
+    "Беконайзер": 299, "Лонг Чикен": 279, "Картошка Фри": 149,
+    "Картошка По-Деревенски": 169, "Наггетсы 8шт": 259, "Наггетсы 16шт": 399,
+    "Луковые Кольца": 189, "Сырные Палочки": 229, "Кола 0.5л": 119,
+    "Кола 1л": 179, "Фанта 0.5л": 119, "Спрайт 0.5л": 119,
+    "Молочный Коктейль": 199, "Ледяной Чай": 149, "Кофе": 129,
+    "Мороженое": 99, "Чизкейк": 159, "Яблочный Пирог": 139,
+    "Маффин": 119, "Кетчуп": 49, "Сырный Соус": 49, "Чесночный Соус": 49,
+    "Барбекю": 49, "Карри": 49
+}
