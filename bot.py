@@ -14,9 +14,9 @@ user_cart = defaultdict(list)
 
 # Ссылки на фото
 PHOTOS = {
-    "start": "https://i.imgur.com/9R0KZbA.jpeg",
-    "menu": "https://i.imgur.com/7Q9V9zJ.jpeg", 
-    "cart": "https://i.imgur.com/5X8wZ2B.jpeg"
+    "start": "https://imgur.com/a/KT9Bn51",
+    "menu": "https://imgur.com/a/KT9Bn51", 
+    "cart": "https://imgur.com/a/KT9Bn51"
 }
 
 @dp.message(CommandStart())
@@ -305,3 +305,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
