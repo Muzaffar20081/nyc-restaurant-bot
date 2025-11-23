@@ -1,38 +1,26 @@
-# ai_brain.py — весь мозг Grok здесь
+import os
 import httpx
-
-import logging
-
-MENU = """
-Воппер — 349₽
-Двойной Воппер — 449₽
-Чизбургер — 149₽
-Биг Кинг — 399₽
-Картошка большая — 149₽
-Наггетсы 9шт — 259₽
-Кола 0.5 — 119₽
-Кола 1л — 179₽
-Коктейль — 199₽
-"""
+from config import GROK_API_KEY
+from menu import BURGER_KING_MENU
 
 async def ask_grok(text: str, cart_info: str = "") -> str:
-    prompt = f"""{MENU}
+    prompt = f"""{BURGER_KING_MENU}
 
 Клиент написал: "{text}"
 Корзина: {cart_info}
 
-Ты дерзкий сотрудник Burger King. 
-- Если просят меню — ответь ровно: /menu
-- Если заказывают — добавь в корзину и скажи "Закинул!"
-- Если "сколько" — только сумма
-- Отвечай коротко и по-пацански"""
-
+Ты дерзкий сотрудник Burger King.
+- Если просят меню - ответь ровно: /menu
+- Если заказывают - добавь в корзину и скажи "Закинул!"
+- Если "сколько" - только сумма
+- Отвечай коротко и по-падански"""
+    
     try:
         async with httpx.AsyncClient(timeout=40) as client:
             r = await client.post(
                 "https://api.x.ai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {os.getenv('GROK_API_KEY')}"},
-                json={
+                headers={"Authorization": f"Bearer {GROK_API_KEY}"},
+                json={ 
                     "model": "grok-2-latest",
                     "messages": [{"role": "user", "content": prompt}],
                     "temperature": 0.9,
@@ -41,6 +29,6 @@ async def ask_grok(text: str, cart_info: str = "") -> str:
             )
             if r.status_code == 200:
                 return r.json()["choices"][0]["message"]["content"].strip()
-            return "Техработы, брат"
+            return "Техноборщи, брат"
     except:
-        return "На перекуре 1 сек"
+        return "На перекуре, 1 сек"
