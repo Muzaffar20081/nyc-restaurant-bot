@@ -3,5 +3,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8244967100:AAFG7beMM5Qdqwz1qQDjnfJoHxM1QqjXAE")
-RESTAURANTS_FOLDER = "restaurants"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+RESTAURANT_ID = os.getenv("RESTAURANT_ID", "burger_king")  # ID ресторана из базы
+ADMIN_ID = os.getenv("ADMIN_ID", "")  # Для уведомлений
