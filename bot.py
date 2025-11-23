@@ -1,13 +1,14 @@
-# bot.py — ПРОСТАЯ РАБОЧАЯ ВЕРСИЯ БЕЗ ФОТО
+# bot.py - ОСНОВНОЙ БОТ ДЛЯ КАФЕ
 import os
 from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from config import BOT_TOKEN
 from menu import CATEGORIES, ALL_ITEMS, MENU_TEXT
 from ai_brain import ask_grok
 
-bot = Bot(token=os.getenv("BOT_TOKEN"))
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 user_cart = defaultdict(list)
@@ -19,11 +20,11 @@ async def start(message: types.Message):
     ai_mode[user_id] = False
     
     await message.answer(
-        f"🍔 *BURGER KING 2025* 🍔\n\n"
-        f"Здарова, {message.from_user.first_name}!\n"
-        f"Выбирай меню или общайся с AI! 🤖",
+        f"🍕 *Добро пожаловать!* 🍔\n\n"
+        f"Привет, {message.from_user.first_name}!\n"
+        f"Заказывайте любимую еду прямо в телеграме!",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🍕 Меню", callback_data="menu")],
             [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
             [InlineKeyboardButton(text="💬 AI Режим", callback_data="chat_mode")]
         ]),
@@ -82,9 +83,8 @@ async def show_category_items(call: types.CallbackQuery):
                 ))
         keyboard.append(row)
     
-    keyboard.append([InlineKeyboardButton(text="🔙 Назад к категориям", callback_data="menu")])
+    keyboard.append([InlineKeyboardButton(text="🔙 Назад", callback_data="menu")])
     keyboard.append([InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")])
-    keyboard.append([InlineKeyboardButton(text="💬 AI Режим", callback_data="chat_mode")])
     
     caption = f"*{full_category_name}*\n\nВыбери что хочешь заказать:"
     
@@ -138,10 +138,9 @@ async def show_cart(call: types.CallbackQuery):
         text += f"\n💵 *Итого: {total}₽*"
         
         keyboard = [
-            [InlineKeyboardButton(text="🧹 Очистить корзину", callback_data="clear_cart")],
-            [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
-            [InlineKeyboardButton(text="🍔 Продолжить покупки", callback_data="menu")],
-            [InlineKeyboardButton(text="💬 AI Режим", callback_data="chat_mode")]
+            [InlineKeyboardButton(text="🧹 Очистить", callback_data="clear_cart")],
+            [InlineKeyboardButton(text="✅ Заказать", callback_data="checkout")],
+            [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")]
         ]
     
     await call.message.edit_text(
@@ -175,13 +174,12 @@ async def checkout(call: types.CallbackQuery):
     order_text = f"✅ *Заказ принят!*\n\n"
     for item in cart_items:
         order_text += f"• {item['name']} — {item['price']}₽\n"
-    order_text += f"\n💵 Сумма: {total}₽\n📱 Статус: принят\n\nОжидай уведомление о готовности!"
+    order_text += f"\n💵 Сумма: {total}₽\n📞 С вами свяжутся для подтверждения!"
     
     await call.message.edit_text(
         text=order_text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🍔 Новый заказ", callback_data="menu")],
-            [InlineKeyboardButton(text="💬 AI Режим", callback_data="chat_mode")]
+            [InlineKeyboardButton(text="🍔 Новый заказ", callback_data="menu")]
         ]),
         parse_mode="Markdown"
     )
@@ -194,12 +192,12 @@ async def enable_chat_mode(call: types.CallbackQuery):
     
     await call.message.edit_text(
         text="*💬 AI РЕЖИМ ВКЛЮЧЕН!* 🤖\n\n"
-             "Теперь я понимаю обычную речь! Просто пиши что хочешь:\n\n"
-             "• *'Дай два воппера и колу'*\n"
+             "Теперь я понимаю обычную речь!\n\n"
+             "Пиши что хочешь:\n"
+             "• *'Два воппера и колу'*\n"
              "• *'Сколько в корзине?'*\n" 
              "• *'Очисти корзину'*\n"
-             "• *'Что есть вкусного?'*\n\n"
-             "Пиши сообщение ниже 👇",
+             "• *'Что есть?'*",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🍔 Обычное меню", callback_data="menu")],
             [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
@@ -215,10 +213,9 @@ async def disable_ai_mode(call: types.CallbackQuery):
     ai_mode[user_id] = False
     
     await call.message.edit_text(
-        text="*❌ AI РЕЖИМ ВЫКЛЮЧЕН*\n\nТеперь используй кнопки меню для заказа 🍔",
+        text="*❌ AI РЕЖИМ ВЫКЛЮЧЕН*\n\nИспользуй кнопки меню 🍔",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
-            [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
             [InlineKeyboardButton(text="💬 Включить AI", callback_data="chat_mode")]
         ]),
         parse_mode="Markdown"
@@ -230,29 +227,14 @@ async def handle_message(message: types.Message):
     user_id = message.from_user.id
     user_text = message.text.strip()
     
-    # Если точное название товара - добавляем сразу
     if user_text in ALL_ITEMS:
         user_cart[user_id].append({
             "name": user_text,
             "price": ALL_ITEMS[user_text]
         })
         await message.answer(f"✅ {user_text} добавлен в корзину!")
-        
-        cart_items = user_cart[user_id]
-        total = sum(item["price"] for item in cart_items)
-        
-        await message.answer(
-            f"*🛒 В корзине товаров на {total}₽*",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-                [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
-                [InlineKeyboardButton(text="💬 AI Режим", callback_data="chat_mode")]
-            ]),
-            parse_mode="Markdown"
-        )
         return
     
-    # Если AI режим включен - обрабатываем через Grok
     if ai_mode.get(user_id, False):
         cart_items = user_cart[user_id]
         cart_info = "пусто"
@@ -264,10 +246,8 @@ async def handle_message(message: types.Message):
                 item_counts[name] = item_counts.get(name, 0) + 1
             cart_info = ", ".join([f"{name}×{count}" for name, count in item_counts.items()]) + f" - {total}₽"
         
-        # Получаем ответ от AI
         ai_response = await ask_grok(user_text, cart_info)
         
-        # Отправляем ответ
         await message.answer(
             f"*🤖 Бот:* {ai_response}",
             parse_mode="Markdown",
@@ -278,9 +258,8 @@ async def handle_message(message: types.Message):
             ])
         )
     else:
-        # Если AI режим выключен
         await message.answer(
-            "🤔 Не понял тебя! Включи AI режим или используй кнопки 👇",
+            "🤔 Не понял! Включи AI режим или используй кнопки 👇",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
                 [InlineKeyboardButton(text="💬 Включить AI", callback_data="chat_mode")]
