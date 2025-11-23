@@ -1,34 +1,48 @@
+# ai_brain.py - МОЗГ БОТА С GROK AI
 import os
 import httpx
-from config import GROK_API_KEY
-from menu import BURGER_KING_MENU
+from menu import ALL_ITEMS
 
 async def ask_grok(text: str, cart_info: str = "") -> str:
-    prompt = f"""{BURGER_KING_MENU}
+    # Формируем текст меню для промпта
+    menu_text = "МЕНЮ BURGER KING:\n"
+    for item, price in ALL_ITEMS.items():
+        menu_text += f"{item} - {price}₽\n"
+    
+    prompt = f"""{menu_text}
 
 Клиент написал: "{text}"
 Корзина: {cart_info}
 
-Ты дерзкий сотрудник Burger King.
-- Если просят меню - ответь ровно: /menu
-- Если заказывают - добавь в корзину и скажи "Закинул!"
-- Если "сколько" - только сумма
-- Отвечай коротко и по-падански"""
-    
+Ты дерзкий сотрудник Burger King. Отвечай коротко и по-падански!
+- Если просят меню или "что есть" - ответь "Смотри меню выше 👆"
+- Если заказывают товар из меню - скажи "Закинул в корзину! 🛒"
+- Если спрашивают про корзину - ответь "В корзине: {cart_info}"
+- Если говорят "очисти корзину" - скажи "Корзина очищена! 🧹"
+- Если просят итого или сумму - покажи общую сумму
+- На остальное отвечай кратко и по-делу"""
+
     try:
-        async with httpx.AsyncClient(timeout=40) as client:
-            r = await client.post(
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
                 "https://api.x.ai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {GROK_API_KEY}"},
-                json={ 
+                headers={
+                    "Authorization": f"Bearer {os.getenv('GROK_API_KEY')}",
+                    "Content-Type": "application/json"
+                },
+                json={
                     "model": "grok-2-latest",
                     "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0.9,
-                    "max_tokens": 200
+                    "temperature": 0.7,
+                    "max_tokens": 150
                 }
             )
-            if r.status_code == 200:
-                return r.json()["choices"][0]["message"]["content"].strip()
-            return "Техноборщи, брат"
-    except:
-        return "На перекуре, 1 сек"
+            
+            if response.status_code == 200:
+                result = response.json()
+                return result["choices"][0]["message"]["content"].strip()
+            else:
+                return "Чё-то с API, брат... 🛠️"
+                
+    except Exception as e:
+        return f"Технические шоколадки... 🔌"
