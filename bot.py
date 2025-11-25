@@ -28,11 +28,14 @@ async def start(message: types.Message):
         "Выбирай, что хочешь — и поехали! 😋"
     )
 
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
-        [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-        [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")]
-    ])
+🧺 *В вашей корзине сейчас:*  
+
+— 🍔 Блюда  
+— 🍟 Закуски  
+— 🥤 Напитки  
+
+Если хотите — можете оформить заказ или продолжить выбирать 😋
+
 
     await message.answer(
         text,
@@ -287,4 +290,5 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
 
