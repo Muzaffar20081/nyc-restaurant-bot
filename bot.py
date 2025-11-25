@@ -21,31 +21,18 @@ async def start(message: types.Message):
     user_id = message.from_user.id
     ai_mode[user_id] = False
 
-text = (
-    "🧺 *ВАША КОРЗИНА*\n\n"
-    "Пока что здесь пусто… 😔\n"
-    "Добавьте что-нибудь из меню, и я всё соберу! 🍔🍟🥤\n\n"
-    "Выбирайте дальше:"
-)
-
-keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
-    [InlineKeyboardButton(text="🛒 Оформить заказ", callback_data="checkout")]
-])
-
-
-keyboard = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
-    [InlineKeyboardButton(text="🛒 Оформить заказ", callback_data="checkout")]
-])
-
-
     await message.answer(
-        text,
+        "ДОБРО ПОЖАЛОВАТЬ В НАШЕ КАФЕ!\n\n"
+        f"Привет, {message.from_user.first_name}!\n"
+        "Горячая еда, быстрый заказ — всё здесь\n"
+        "Выбирай, что хочешь — и погнали!",
         parse_mode="Markdown",
-        reply_markup=keyboard
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="Корзина", callback_data="cart")],
+            [InlineKeyboardButton(text="AI-Помощник", callback_data="chat_mode")]
+        ])
     )
-
 
 
 @dp.callback_query(lambda c: c.data == "menu")
@@ -293,6 +280,3 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-
-
-
