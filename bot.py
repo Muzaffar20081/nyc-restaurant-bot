@@ -15,24 +15,30 @@ dp = Dispatcher()
 user_cart = defaultdict(list)
 ai_mode = defaultdict(bool)
 
-
 @dp.message(CommandStart())
 async def start(message: types.Message):
     user_id = message.from_user.id
     ai_mode[user_id] = False
 
-    await message.answer(
-        "ДОБРО ПОЖАЛОВАТЬ В НАШЕ КАФЕ!\n\n"
-        f"Привет, {message.from_user.first_name}!\n"
-        "Горячая еда, быстрый заказ — всё здесь\n"
-        "Выбирай, что хочешь — и погнали!",
-        parse_mode="Markdown",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Меню", callback_data="menu")],
-            [InlineKeyboardButton(text="Корзина", callback_data="cart")],
-            [InlineKeyboardButton(text="AI-Помощник", callback_data="chat_mode")]
-        ])
+    text = (
+        "🌟 *ДОБРО ПОЖАЛОВАТЬ В НАШЕ КАФЕ!* 🌟\n\n"
+        f"👋 Привет, *{message.from_user.first_name}*!\n"
+        "🍽 Горячая еда, быстрый заказ — всё тут!\n\n"
+        "Выбирай, что хочешь — и поехали! 😋"
     )
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+        [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
+        [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")]
+    ])
+
+    await message.answer(
+        text,
+        parse_mode="Markdown",
+        reply_markup=keyboard
+    )
+
 
 
 @dp.callback_query(lambda c: c.data == "menu")
@@ -280,3 +286,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
