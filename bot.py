@@ -5,7 +5,6 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from config import BOT_TOKEN, CAFES, DEFAULT_CAFE
-from ai_brain import ask_grok
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
@@ -26,9 +25,8 @@ def load_menu(cafe_key):
         menu_module = importlib.import_module(module_path)
         return menu_module.CATEGORIES, menu_module.ALL_ITEMS, menu_module.MENU_TEXT
     except Exception as e:
-        print(f"Ошибка загрузки меню для {cafe_key}: {e}")
-        default_module = importlib.import_module(CAFES[DEFAULT_CAFE]["menu_file"])
-        return default_module.CATEGORIES, default_module.ALL_ITEMS, default_module.MENU_TEXT
+        print(f"❌ Ошибка загрузки меню для {cafe_key}: {e}")
+        return {}, {}, "Меню временно недоступно"
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
@@ -42,8 +40,7 @@ async def start(message: types.Message):
     ])
     
     await message.answer(
-        "🏪 *ДОБРО ПОЖАЛОВАТЬ!*\n\n"
-        "Выбери кафе, из которого хочешь заказать:",
+        "🏪 *ДОБРО ПОЖАЛОВАТЬ!*\n\nВыбери кафе:",
         parse_mode="Markdown",
         reply_markup=keyboard
     )
@@ -60,13 +57,11 @@ async def select_cafe(call: types.CallbackQuery):
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
             [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-            [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")],
             [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
         ])
         
         await call.message.edit_text(
-            f"🏪 {cafe_name}\n\n"
-            "Готов принимать ваш заказ! Что желаете?",
+            f"🏪 {cafe_name}\n\nГотов принимать заказ!",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
@@ -84,8 +79,7 @@ async def change_cafe(call: types.CallbackQuery):
     ])
     
     await call.message.edit_text(
-        "🏪 *СМЕНА КАФЕ*\n\n"
-        "Корзина очищена! Выбери новое кафе:",
+        "🏪 *СМЕНА КАФЕ*\n\nКорзина очищена! Выбери новое кафе:",
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -105,7 +99,6 @@ async def show_categories(call: types.CallbackQuery):
     
     keyboard += [
         [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-        [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")],
         [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
     ]
     
@@ -152,12 +145,12 @@ async def show_category_items(call: types.CallbackQuery):
         keyboard.append(row)
     
     keyboard += [
-        [InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="menu")],
+        [InlineKeyboardButton(text="⬅️ Назад", callback_data="menu")],
         [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
     ]
     
     await call.message.edit_text(
-        text=f"*{full_category_name}*\n\nВыбирай вкусняшку:",
+        text=f"*{full_category_name}*\n\nВыбирай:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         parse_mode="Markdown"
     )
@@ -192,13 +185,12 @@ async def show_cart(call: types.CallbackQuery):
     if not cart_items:
         text = f"*{cafe_name}*\n\n🛒 *Корзина пустая!*\n\n"
         keyboard = [
-            [InlineKeyboardButton(text="📖 Перейти в меню", callback_data="menu")],
-            [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")],
+            [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
             [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
         ]
     else:
         total = sum(item["price"] for item in cart_items)
-        text = f"*{cafe_name}*\n\n🛒 *Твоя корзина:*\n\n"
+        text = f"*{cafe_name}*\n\n🛒 *Корзина:*\n\n"
         counts = {}
         for item in cart_items:
             name = item["name"]
@@ -210,10 +202,9 @@ async def show_cart(call: types.CallbackQuery):
         
         text += f"\n*Итого: {total}₽*"
         keyboard = [
-            [InlineKeyboardButton(text="🗑 Очистить корзину", callback_data="clear_cart")],
-            [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
-            [InlineKeyboardButton(text="📖 В меню", callback_data="menu")],
-            [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
+            [InlineKeyboardButton(text="🗑 Очистить", callback_data="clear_cart")],
+            [InlineKeyboardButton(text="✅ Заказ", callback_data="checkout")],
+            [InlineKeyboardButton(text="📖 Меню", callback_data="menu")]
         ]
     
     await call.message.edit_text(
@@ -244,7 +235,7 @@ async def checkout(call: types.CallbackQuery):
     cafe_name = CAFES[cafe_key]["name"]
     total = sum(item["price"] for item in cart_items)
     
-    order_text = f"🏪 *ЗАКАЗ ИЗ {cafe_name.upper()}*\n\n"
+    order_text = f"🏪 *ЗАКАЗ ИЗ {cafe_name}*\n\n"
     counts = {}
     for item in cart_items:
         name = item["name"]
@@ -255,111 +246,29 @@ async def checkout(call: types.CallbackQuery):
         order_text += f"• {name} × {cnt} = {price}₽\n"
     
     order_text += f"\n*Сумма: {total}₽*\n"
-    order_text += "Менеджер свяжется с вами в ближайшее время!"
+    order_text += "Скоро свяжемся с вами!"
     
     await call.message.edit_text(
         text=order_text,
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📖 Сделать новый заказ", callback_data="menu")]
+            [InlineKeyboardButton(text="📖 Новый заказ", callback_data="menu")]
         ]),
         parse_mode="Markdown"
     )
     await call.answer("Заказ отправлен!")
 
-# Остальные функции AI остаются как были
-@dp.callback_query(lambda c: c.data == "chat_mode")
-async def enable_chat_mode(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    ai_mode[user_id] = True
-    cafe_key = user_cafe[user_id]
-    cafe_name = CAFES[cafe_key]["name"]
-    
-    await call.message.edit_text(
-        f"🏪 {cafe_name}\n\n"
-        "*AI-ПОМОЩНИК ВКЛЮЧЁН!*\n\n"
-        "Теперь просто пиши, что хочешь:\n\n"
-        "• Две пепперони и колу\n"
-        "• Покажи корзину\n" 
-        "• Очисти всё\n"
-        "• Что посоветуешь?\n\n"
-        "Я всё пойму!",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📖 Вернуться в меню", callback_data="menu")],
-            [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-            [InlineKeyboardButton(text="❌ Выключить AI", callback_data="disable_ai")]
-        ]),
-        parse_mode="Markdown"
-    )
-    await call.answer("AI включён!")
-
-@dp.callback_query(lambda c: c.data == "disable_ai")
-async def disable_ai_mode(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    ai_mode[user_id] = False
-    cafe_key = user_cafe[user_id]
-    cafe_name = CAFES[cafe_key]["name"]
-    
-    await call.message.edit_text(
-        f"🏪 {cafe_name}\n\n"
-        "*AI-ПОМОЩНИК ВЫКЛЮЧЕН*\n\n"
-        "Используй кнопки ниже",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
-            [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")],
-            [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
-        ]),
-        parse_mode="Markdown"
-    )
-    await call.answer()
-
 @dp.message()
 async def handle_message(message: types.Message):
-    user_id = message.from_user.id
-    text = message.text.strip()
-    cafe_key = user_cafe[user_id]
-    _, ALL_ITEMS, _ = load_menu(cafe_key)
-    
-    if text in ALL_ITEMS:
-        user_cart[user_id].append({
-            "name": text, 
-            "price": ALL_ITEMS[text],
-            "cafe": cafe_key
-        })
-        await message.answer(f"{text} — добавлено в корзину!")
-        return
-    
-    if ai_mode.get(user_id, False):
-        cart_items = user_cart[user_id]
-        cart_info = "пустая"
-        if cart_items:
-            total = sum(i["price"] for i in cart_items)
-            counts = defaultdict(int)
-            for i in cart_items:
-                counts[i["name"]] += 1
-            cart_info = ", ".join(f"{n}×{c}" for n, c in counts.items()) + f" → {total}₽"
-        
-        response = await ask_grok(text, cart_info)
-        await message.answer(
-            f"*AI:* {response}",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-                [InlineKeyboardButton(text="🤖 Чат с AI", callback_data="chat_mode")]
-            ])
-        )
-    else:
-        await message.answer(
-            "Не понял команду\n"
-            "Нажми на кнопки или включи AI",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
-                [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")]
-            ])
-        )
+    await message.answer(
+        "Используй кнопки меню 👆",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
+        ])
+    )
 
 async def main():
-    print("🏪 Универсальный бот для всех кафе запущен!")
+    print("🏪 Бот запущен!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
