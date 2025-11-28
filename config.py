@@ -1,8 +1,22 @@
-import os
-from dotenv import load_dotenv
+BOT_TOKEN = "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE"
 
-load_dotenv()
+# Настройки для разных кафе
+CAFES = {
+    "italy": {
+        "name": "🍝 Итальянское кафе 'Белла Италия'",
+        "menu_file": "menus.italy_menu",
+        "admin_id": 123456789
+    },
+    "sushi": {
+        "name": "🍣 Суши-бар 'Токио'", 
+        "menu_file": "menus.sushi_menu",
+        "admin_id": 123456789
+    },
+    "burger": {
+        "name": "🍔 Бургер-хаус 'Гриль Мастер'",
+        "menu_file": "menus.burger_menu", 
+        "admin_id": 123456789
+    }
+}
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-RESTAURANT_ID = os.getenv("RESTAURANT_ID", "burger_king")  # ID ресторана из базы
-ADMIN_ID = os.getenv("ADMIN_ID", "")  # Для уведомлений
+DEFAULT_CAFE = "italy"
