@@ -88,10 +88,9 @@ async def select_cafe(call: types.CallbackQuery):
 ✨ *Выбирайте удобный способ:*
 """
         
-        # Пытаемся отправить фото
         try:
             if cafe_photo:
-                # Сначала отправляем фото
+                # Отправляем фото с кнопками
                 await bot.send_photo(
                     chat_id=call.message.chat.id,
                     photo=cafe_photo,
@@ -99,47 +98,47 @@ async def select_cafe(call: types.CallbackQuery):
                     parse_mode="Markdown",
                     reply_markup=keyboard
                 )
-                # Удаляем старое сообщение с выбором кафе
+                # Удаляем старое сообщение
                 await call.message.delete()
             else:
-                # Если фото нет - просто редактируем сообщение
+                # Если фото нет - редактируем сообщение с кнопками
                 await call.message.edit_text(
                     welcome_message,
                     reply_markup=keyboard,
                     parse_mode="Markdown"
                 )
         except Exception as e:
-            # Если фото не загружается - показываем просто текст
-            print(f"❌ Ошибка загрузки фото: {e}")
+            print(f"❌ Ошибка: {e}")
+            # Если ошибка - просто редактируем текст с кнопками
             await call.message.edit_text(
                 welcome_message,
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
         
-        # Без уведомления
         await call.answer()
     else:
         await call.answer()
 
-@dp.callback_query(lambda c: c.data == "change_cafe")
-async def change_cafe(call: types.CallbackQuery):
+@dp.callback_query(lambda c: c.data.startswith("cafe_"))
+async def select_cafe(call: types.CallbackQuery):
     user_id = call.from_user.id
-    user_cart[user_id] = []
+    cafe_key = call.data[5:]
     
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🍝 Итальянское кафе", callback_data="cafe_italy")],
-        [InlineKeyboardButton(text="🍣 Суши-бар", callback_data="cafe_sushi")],
-        [InlineKeyboardButton(text="🍔 Бургер-хаус", callback_data="cafe_burger")],
-    ])
+    if cafe_key in CAFES:
+        user_cafe[user_id] = cafe_key
+        cafe_name = CAFES[cafe_key]["name"]
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
+        ])
+        
+        await call.message.edit_text(
+            f"🏪 {cafe_name}\n\nВыберите действие:",
+            reply_markup=keyboard
+        )
     
-    await call.message.edit_text(
-        "🔄 *СМЕНА КАФЕ*\n\n"
-        "🗑️ *Корзина очищена!*\n\n"
-        "🎯 *Выбери новое кафе:*",
-        reply_markup=keyboard,
-        parse_mode="Markdown"
-    )
     await call.answer()
 
 @dp.callback_query(lambda c: c.data == "menu")
@@ -458,3 +457,4 @@ async def main():
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
+
