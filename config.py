@@ -10,7 +10,7 @@ CAFES = {
     "sushi": {
         "name": "🍣 Суши-бар 'Токио'", 
         "menu_file": "menus.sushi_menu",
-        "photo": "https://example.com/sushi.jpg",
+        "photo": "https://imgur.com/a/D5CoBRm",
         "color": "🔵"  # Синий для суши
     },
     "burger": {
@@ -22,3 +22,4 @@ CAFES = {
 }
 
 DEFAULT_CAFE = "italy"
+
