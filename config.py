@@ -4,7 +4,7 @@ CAFES = {
     "italy": {
         "name": "🍝 Итальянское кафе 'Белла Италия'",
         "menu_file": "menus.italy_menu",
-        "photo": "https://example.com/italy.jpg",  # Замени на реальные фото
+        "photo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTY2yRuUqwKS7cDn8dzcs24WPvrySIka568fA&s",  # Замени на реальные фото
         "color": "🟡"  # Желтый для Италии
     },
     "sushi": {
@@ -22,5 +22,6 @@ CAFES = {
 }
 
 DEFAULT_CAFE = "italy"
+
 
 
