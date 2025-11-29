@@ -10,7 +10,7 @@ CAFES = {
     "sushi": {
         "name": "🍣 Суши-бар 'Токио'", 
         "menu_file": "menus.sushi_menu",
-        "photo": "https://imgur.com/a/D5CoBRm",
+        "photo": "https://womanvip.ru/wp-content/uploads/2017/05/rolli7.jpg",
         "color": "🔵"  # Синий для суши
     },
     "burger": {
@@ -22,4 +22,5 @@ CAFES = {
 }
 
 DEFAULT_CAFE = "italy"
+
 
