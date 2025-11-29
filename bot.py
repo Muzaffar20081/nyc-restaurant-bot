@@ -117,10 +117,10 @@ async def select_cafe(call: types.CallbackQuery):
                 parse_mode="Markdown"
             )
         
-        # Отправляем уведомление о выборе кафе
-        await call.answer(f"🎊 Отлично! Вы выбрали {cafe_name}")
+        # Без уведомления
+        await call.answer()
     else:
-        await call.answer("❌ Кафе не найдено")
+        await call.answer()
 
 @dp.callback_query(lambda c: c.data == "change_cafe")
 async def change_cafe(call: types.CallbackQuery):
@@ -140,7 +140,7 @@ async def change_cafe(call: types.CallbackQuery):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
-    await call.answer("🔄 Корзина очищена!")
+    await call.answer()
 
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_categories(call: types.CallbackQuery):
@@ -170,7 +170,7 @@ async def show_categories(call: types.CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         parse_mode="Markdown"
     )
-    await call.answer("📖 Меню загружено!")
+    await call.answer()
 
 @dp.callback_query(lambda c: c.data.startswith("category_"))
 async def show_category_items(call: types.CallbackQuery):
@@ -190,7 +190,7 @@ async def show_category_items(call: types.CallbackQuery):
             break
     
     if not full_category_name:
-        await call.answer("❌ Категория не найдена")
+        await call.answer()
         return
     
     items = CATEGORIES[full_category_name]
@@ -220,7 +220,7 @@ async def show_category_items(call: types.CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         parse_mode="Markdown"
     )
-    await call.answer(f"🎊 {full_category_name}")
+    await call.answer()
 
 @dp.callback_query(lambda c: c.data.startswith("add_"))
 async def add_to_cart(call: types.CallbackQuery):
@@ -236,13 +236,10 @@ async def add_to_cart(call: types.CallbackQuery):
             "cafe": cafe_key
         })
         
-        # Красивое уведомление о добавлении
-        await call.answer(
-            f"✅ {item_name}\n🎉 Добавлено в корзину!", 
-            show_alert=True
-        )
+        # Без всплывающего уведомления
+        await call.answer()
     else:
-        await call.answer("❌ Товар не найден в меню")
+        await call.answer()
 
 @dp.callback_query(lambda c: c.data == "cart")
 async def show_cart(call: types.CallbackQuery):
@@ -297,13 +294,13 @@ async def show_cart(call: types.CallbackQuery):
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         parse_mode="Markdown"
     )
-    await call.answer("🛒 Корзина")
+    await call.answer()
 
 @dp.callback_query(lambda c: c.data == "clear_cart")
 async def clear_cart(call: types.CallbackQuery):
     user_id = call.from_user.id
     user_cart[user_id].clear()
-    await call.answer("🗑 Корзина очищена!")
+    await call.answer()
     await show_cart(call)
 
 @dp.callback_query(lambda c: c.data == "checkout")
@@ -313,7 +310,7 @@ async def checkout(call: types.CallbackQuery):
     user_cart[user_id].clear()
     
     if not cart_items:
-        await call.answer("❌ Корзина пустая!")
+        await call.answer()
         return
     
     cafe_key = user_cafe[user_id]
@@ -349,7 +346,7 @@ async def checkout(call: types.CallbackQuery):
         ]),
         parse_mode="Markdown"
     )
-    await call.answer("🎊 Заказ отправлен!")
+    await call.answer()
 
 @dp.callback_query(lambda c: c.data == "chat_mode")
 async def enable_chat_mode(call: types.CallbackQuery):
@@ -381,7 +378,7 @@ async def enable_chat_mode(call: types.CallbackQuery):
         ]),
         parse_mode="Markdown"
     )
-    await call.answer("🤖 AI включён!")
+    await call.answer()
 
 @dp.callback_query(lambda c: c.data == "disable_ai")
 async def disable_ai_mode(call: types.CallbackQuery):
@@ -405,7 +402,7 @@ async def disable_ai_mode(call: types.CallbackQuery):
         ]),
         parse_mode="Markdown"
     )
-    await call.answer("❌ AI выключен")
+    await call.answer()
 
 @dp.message()
 async def handle_message(message: types.Message):
