@@ -40,14 +40,8 @@ async def start(message: types.Message):
         [InlineKeyboardButton(text="🍔 Бургер-хаус", callback_data="cafe_burger")],
     ])
     
-    welcome_text = """
-🎉 *ДОБРО ПОЖАЛОВАТЬ В МИР ВКУСА!* 🎉
-
-✨ *Выбери кухню мечты:* ✨
-"""
-    
     await message.answer(
-        welcome_text,
+        "🎉 *ДОБРО ПОЖАЛОВАТЬ!*\n\nВыберите кафе:",
         parse_mode="Markdown",
         reply_markup=keyboard
     )
@@ -62,22 +56,14 @@ async def select_cafe(call: types.CallbackQuery):
         cafe_name = CAFES[cafe_key]["name"]
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="📖 Посмотреть меню", callback_data="menu")],
-            [InlineKeyboardButton(text="🛒 Моя корзина", callback_data="cart")],
+            [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
             [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")],
             [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
         ])
         
-        welcome_message = f"""
-🏪 {cafe_name}
-
-*Добро пожаловать!* 🌟
-
-🍽️ *Готовы сделать заказ?*
-"""
-        
         await call.message.edit_text(
-            welcome_message,
+            f"🏪 {cafe_name}\n\nВыберите действие:",
             reply_markup=keyboard,
             parse_mode="Markdown"
         )
@@ -94,8 +80,9 @@ async def show_categories(call: types.CallbackQuery):
     
     keyboard = []
     for category_name in CATEGORIES.keys():
-        # Создаем callback_data без эмодзи и пробелов
-        callback_data = f"category_{category_name.replace(' ', '_').replace('🍕', '').replace('🍝', '').replace('🥗', '').replace('🍹', '').replace('🍣', '').replace('🍱', '').replace('🍤', '').replace('🍵', '').replace('🍔', '').replace('🍟', '').replace('🥤', '').replace('🍦', '').strip()}"
+        # Простой callback_data без эмодзи
+        clean_name = category_name.replace('🍕', '').replace('🍝', '').replace('🥗', '').replace('🍹', '').replace('🍣', '').replace('🍱', '').replace('🍤', '').replace('🍵', '').replace('🍔', '').replace('🍟', '').replace('🥤', '').replace('🍦', '').strip()
+        callback_data = f"category_{clean_name.replace(' ', '_')}"
         keyboard.append([InlineKeyboardButton(
             text=category_name, 
             callback_data=callback_data
@@ -103,7 +90,6 @@ async def show_categories(call: types.CallbackQuery):
     
     keyboard += [
         [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
-        [InlineKeyboardButton(text="🤖 AI-Помощник", callback_data="chat_mode")],
         [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
     ]
     
@@ -122,10 +108,10 @@ async def show_category_items(call: types.CallbackQuery):
     cafe_key = user_cafe[user_id]
     CATEGORIES, ALL_ITEMS, _ = load_menu(cafe_key)
     
-    category_key = call.data[9:].replace('_', ' ')  # "category_ПИЦЦА" -> "ПИЦЦА"
+    category_key = call.data[9:].replace('_', ' ')
     full_category_name = None
     
-    # Ищем полное название категории с эмодзи
+    # Ищем категорию
     for cat_name in CATEGORIES.keys():
         clean_cat_name = cat_name.replace('🍕', '').replace('🍝', '').replace('🥗', '').replace('🍹', '').replace('🍣', '').replace('🍱', '').replace('🍤', '').replace('🍵', '').replace('🍔', '').replace('🍟', '').replace('🥤', '').replace('🍦', '').strip()
         if clean_cat_name == category_key:
@@ -133,7 +119,7 @@ async def show_category_items(call: types.CallbackQuery):
             break
     
     if not full_category_name:
-        await call.answer()
+        await call.answer("Категория не найдена")
         return
     
     items = CATEGORIES[full_category_name]
@@ -152,7 +138,7 @@ async def show_category_items(call: types.CallbackQuery):
     ]
     
     await call.message.edit_text(
-        text=f"*{full_category_name}*\n\nВыбирайте:",
+        text=f"*{full_category_name}*\n\nВыберите товар:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
         parse_mode="Markdown"
     )
@@ -162,10 +148,11 @@ async def show_category_items(call: types.CallbackQuery):
 async def add_to_cart(call: types.CallbackQuery):
     user_id = call.from_user.id
     cafe_key = user_cafe[user_id]
-    _, ALL_ITEMS, _ = load_menu(cafe_key)
+    CATEGORIES, ALL_ITEMS, _ = load_menu(cafe_key)
     
-    item_name = call.data[4:]  # "add_Маргарита" -> "Маргарита"
+    item_name = call.data[4:]  # "add_🍕 Маргарита" -> "🍕 Маргарита"
     
+    # Проверяем есть ли товар в меню
     if item_name in ALL_ITEMS:
         user_cart[user_id].append({
             "name": item_name, 
@@ -174,7 +161,7 @@ async def add_to_cart(call: types.CallbackQuery):
         })
         await call.answer(f"✅ {item_name} добавлен в корзину!")
     else:
-        await call.answer("❌ Товар не найден")
+        await call.answer("❌ Ошибка: товар не найден")
 
 @dp.callback_query(lambda c: c.data == "cart")
 async def show_cart(call: types.CallbackQuery):
@@ -274,6 +261,7 @@ async def enable_chat_mode(call: types.CallbackQuery):
         "🤖 *AI-помощник включен!*\n\nПишите что хотите заказать:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
             [InlineKeyboardButton(text="❌ Выключить AI", callback_data="disable_ai")]
         ]),
         parse_mode="Markdown"
@@ -327,7 +315,7 @@ async def handle_message(message: types.Message):
             total = sum(item["price"] for item in cart_items)
             counts = {}
             for item in cart_items:
-                counts[item["name"]] += 1
+                counts[item["name"]] = counts.get(item["name"], 0) + 1
             cart_info = ", ".join(f"{n}×{c}" for n, c in counts.items()) + f" → {total}₽"
         
         response = await ask_grok(text, cart_info, cafe_key, ALL_ITEMS)
@@ -351,7 +339,7 @@ async def handle_message(message: types.Message):
         )
 
 async def main():
-    print("✅ Бот запущен!")
+    print("✅ Бот запущен и готов к работе!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
