@@ -4,7 +4,6 @@ from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.types import InputFile
 from config import BOT_TOKEN, CAFES, DEFAULT_CAFE
 from ai_brain import ask_grok
 
@@ -64,12 +63,13 @@ async def start(message: types.Message):
 @dp.callback_query(lambda c: c.data.startswith("cafe_"))
 async def select_cafe(call: types.CallbackQuery):
     user_id = call.from_user.id
-    cafe_key = call.data[5:]
+    cafe_key = call.data[5:]  # Получаем "italy", "sushi", "burger"
     
     if cafe_key in CAFES:
         user_cafe[user_id] = cafe_key
         cafe_name = CAFES[cafe_key]["name"]
         cafe_color = CAFES[cafe_key].get("color", "✨")
+        cafe_photo = CAFES[cafe_key].get("photo", "")
         
         # Красивая клавиатура для кафе
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -88,11 +88,34 @@ async def select_cafe(call: types.CallbackQuery):
 ✨ *Выбирайте удобный способ:*
 """
         
-        await call.message.edit_text(
-            welcome_message,
-            reply_markup=keyboard,
-            parse_mode="Markdown"
-        )
+        # Пытаемся отправить фото
+        try:
+            if cafe_photo:
+                # Сначала отправляем фото
+                await bot.send_photo(
+                    chat_id=call.message.chat.id,
+                    photo=cafe_photo,
+                    caption=welcome_message,
+                    parse_mode="Markdown",
+                    reply_markup=keyboard
+                )
+                # Удаляем старое сообщение с выбором кафе
+                await call.message.delete()
+            else:
+                # Если фото нет - просто редактируем сообщение
+                await call.message.edit_text(
+                    welcome_message,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown"
+                )
+        except Exception as e:
+            # Если фото не загружается - показываем просто текст
+            print(f"❌ Ошибка загрузки фото: {e}")
+            await call.message.edit_text(
+                welcome_message,
+                reply_markup=keyboard,
+                parse_mode="Markdown"
+            )
         
         # Отправляем уведомление о выборе кафе
         await call.answer(f"🎊 Отлично! Вы выбрали {cafe_name}")
@@ -133,7 +156,7 @@ async def show_categories(call: types.CallbackQuery):
     for category_name in CATEGORIES.keys():
         keyboard.append([InlineKeyboardButton(
             text=f"✨ {category_name}", 
-            callback_data=f"category_{category_name.replace(' ', '_')}"
+            callback_data=f"category_{category_name.replace(' ', '_').replace('🍕', '').replace('🍝', '').replace('🥗', '').replace('🍹', '').replace('🍣', '').replace('🍱', '').replace('🍤', '').replace('🍵', '').replace('🍔', '').replace('🍟', '').replace('🥤', '').replace('🍦', '')}"
         )])
     
     keyboard += [
@@ -161,7 +184,8 @@ async def show_category_items(call: types.CallbackQuery):
     full_category_name = None
     
     for cat_name in CATEGORIES.keys():
-        if cat_name.replace(' ', '_') == category_key.replace(' ', '_'):
+        clean_cat_name = cat_name.replace('🍕', '').replace('🍝', '').replace('🥗', '').replace('🍹', '').replace('🍣', '').replace('🍱', '').replace('🍤', '').replace('🍵', '').replace('🍔', '').replace('🍟', '').replace('🥤', '').replace('🍦', '').strip()
+        if clean_cat_name.replace(' ', '_') == category_key:
             full_category_name = cat_name
             break
     
@@ -217,13 +241,6 @@ async def add_to_cart(call: types.CallbackQuery):
             f"✅ {item_name}\n🎉 Добавлено в корзину!", 
             show_alert=True
         )
-        
-        # Вибрационное уведомление (если поддерживается)
-        try:
-            await bot.answer_callback_query(call.id, show_alert=False)
-        except:
-            pass
-            
     else:
         await call.answer("❌ Товар не найден в меню")
 
