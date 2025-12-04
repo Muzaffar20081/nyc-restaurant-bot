@@ -5,107 +5,130 @@ from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.exceptions import TelegramBadRequest
 from config import BOT_TOKEN, CAFES, DEFAULT_CAFE
 from ai_brain import ask_grok
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Хранилища данных пользователей
 user_cart = defaultdict(list)
 ai_mode = defaultdict(bool)
 user_cafe = defaultdict(lambda: DEFAULT_CAFE)
-user_states = defaultdict(dict)  # Для хранения состояния пользователя
 
-# Кэш загруженных меню
-MENU_CACHE = {}
-
+# Простая загрузка меню
 def load_menu(cafe_key):
-    """Загружает меню для конкретного кафе с кэшированием"""
+    """Загружает меню для конкретного кафе - УПРОЩЕННАЯ ВЕРСИЯ"""
     try:
-        if cafe_key not in CAFES:
-            cafe_key = DEFAULT_CAFE
-            logger.warning(f"Кафе {cafe_key} не найдено, используется DEFAULT_CAFE")
+        logger.info(f"Загрузка меню для кафе: {cafe_key}")
         
-        # Проверяем кэш
-        if cafe_key in MENU_CACHE:
-            return MENU_CACHE[cafe_key]
+        if cafe_key not in CAFES:
+            logger.warning(f"Кафе {cafe_key} не найдено, используется {DEFAULT_CAFE}")
+            cafe_key = DEFAULT_CAFE
         
         cafe_config = CAFES[cafe_key]
         module_path = cafe_config["menu_file"]
         
-        # Динамический импорт модуля меню
-        if module_path.startswith('.'):
-            # Относительный импорт
-            module_path = module_path.lstrip('.')
-            from menus import italian_menu, sushi_menu, burger_menu
-            if cafe_key == "italy":
-                return italian_menu.CATEGORIES, italian_menu.ALL_ITEMS, italian_menu.MENU_TEXT
-            elif cafe_key == "sushi":
-                return sushi_menu.CATEGORIES, sushi_menu.ALL_ITEMS, sushi_menu.MENU_TEXT
-            elif cafe_key == "burger":
-                return burger_menu.CATEGORIES, burger_menu.ALL_ITEMS, burger_menu.MENU_TEXT
+        logger.info(f"Путь к модулю меню: {module_path}")
+        
+        # Упрощенный импорт меню
+        if module_path == "menus.italian_menu":
+            from menus import italian_menu
+            menu_module = italian_menu
+        elif module_path == "menus.sushi_menu":
+            from menus import sushi_menu
+            menu_module = sushi_menu
+        elif module_path == "menus.burger_menu":
+            from menus import burger_menu
+            menu_module = burger_menu
         else:
-            # Абсолютный импорт
+            # Пробуем обычный импорт
             menu_module = importlib.import_module(module_path)
-            result = (menu_module.CATEGORIES, menu_module.ALL_ITEMS, menu_module.MENU_TEXT)
-            MENU_CACHE[cafe_key] = result
-            return result
-            
-    except ImportError as e:
-        logger.error(f"Ошибка импорта меню для {cafe_key}: {e}")
-        # Возвращаем пустое меню
-        return {}, {}, "📋 Меню временно недоступно"
+        
+        logger.info(f"Меню загружено: {len(menu_module.CATEGORIES)} категорий, {len(menu_module.ALL_ITEMS)} товаров")
+        
+        return menu_module.CATEGORIES, menu_module.ALL_ITEMS, menu_module.MENU_TEXT
+        
     except Exception as e:
-        logger.error(f"Ошибка загрузки меню для {cafe_key}: {e}")
-        return {}, {}, "📋 Меню временно недоступно"
+        logger.error(f"❌ Ошибка загрузки меню для {cafe_key}: {e}")
+        
+        # Возвращаем простые тестовые данные при ошибке
+        if cafe_key == "italy":
+            CATEGORIES = {
+                "🍕 Пицца": {"Маргарита": 450, "Пепперони": 550},
+                "🍝 Паста": {"Карбонара": 400, "Болоньезе": 450}
+            }
+            ALL_ITEMS = {"Маргарита": 450, "Пепперони": 550, "Карбонара": 400, "Болоньезе": 450}
+            MENU_TEXT = "🍕 Итальянская кухня - тестовое меню"
+        elif cafe_key == "sushi":
+            CATEGORIES = {
+                "🍣 Роллы": {"Филадельфия": 450, "Калифорния": 400},
+                "🍱 Сеты": {"Сет на 2 персоны": 1200}
+            }
+            ALL_ITEMS = {"Филадельфия": 450, "Калифорния": 400, "Сет на 2 персоны": 1200}
+            MENU_TEXT = "🍣 Суши-бар - тестовое меню"
+        elif cafe_key == "burger":
+            CATEGORIES = {
+                "🍔 Бургеры": {"Чизбургер": 300, "Чикенбургер": 350},
+                "🍟 Закуски": {"Картофель фри": 150}
+            }
+            ALL_ITEMS = {"Чизбургер": 300, "Чикенбургер": 350, "Картофель фри": 150}
+            MENU_TEXT = "🍔 Бургер-хаус - тестовое меню"
+        else:
+            CATEGORIES = {}
+            ALL_ITEMS = {}
+            MENU_TEXT = "📋 Меню временно недоступно"
+        
+        return CATEGORIES, ALL_ITEMS, MENU_TEXT
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
     """Обработчик команды /start"""
-    user_id = message.from_user.id
-    ai_mode[user_id] = False
-    
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🍝 Итальянское кафе", callback_data="cafe:italy")],
-        [InlineKeyboardButton(text="🍣 Суши-бар", callback_data="cafe:sushi")],
-        [InlineKeyboardButton(text="🍔 Бургер-хаус", callback_data="cafe:burger")],
-    ])
-    
-    welcome_text = """
+    try:
+        user_id = message.from_user.id
+        ai_mode[user_id] = False
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🍝 Итальянское кафе", callback_data="cafe_italy")],
+            [InlineKeyboardButton(text="🍣 Суши-бар", callback_data="cafe_sushi")],
+            [InlineKeyboardButton(text="🍔 Бургер-хаус", callback_data="cafe_burger")],
+        ])
+        
+        welcome_text = """
 🎊 *ДОБРО ПОЖАЛОВАТЬ В МИР ВКУСА!* 🎊
 
 🌟 *Выберите кухню вашей мечты:*
 
 • 🍝 *Италия* - нежная паста и ароматная пицца
 • 🍣 *Япония* - изысканные суши и роллы  
-• 🍔 *Америка* - сочные бургеры и хрустящий картофель
+• 🔵 *Америка* - сочные бургеры и хрустящий картофель
 
 🎯 *Готовы к гастрономическому путешествию?*
 """
-    
-    try:
+        
         await message.answer(
             welcome_text,
             parse_mode="Markdown",
             reply_markup=keyboard
         )
+        logger.info(f"Пользователь {user_id} запустил бота")
+        
     except Exception as e:
         logger.error(f"Ошибка в start: {e}")
-        await message.answer("Произошла ошибка. Пожалуйста, попробуйте снова.")
+        await message.answer("Произошла ошибка при запуске бота. Попробуйте позже.")
 
-@dp.callback_query(lambda c: c.data.startswith("cafe:"))
+@dp.callback_query(lambda c: c.data.startswith("cafe_"))
 async def select_cafe(call: types.CallbackQuery):
     """Выбор кафе"""
-    user_id = call.from_user.id
-    cafe_key = call.data.split(":")[1]
-    
     try:
+        user_id = call.from_user.id
+        cafe_key = call.data[5:]  # Убираем "cafe_"
+        
+        logger.info(f"Пользователь {user_id} выбирает кафе: {cafe_key}")
+        
         if cafe_key in CAFES:
             user_cafe[user_id] = cafe_key
             cafe_name = CAFES[cafe_key]["name"]
@@ -144,38 +167,46 @@ async def select_cafe(call: types.CallbackQuery):
                         reply_markup=keyboard,
                         parse_mode="Markdown"
                     )
-            except TelegramBadRequest:
-                # Если сообщение уже отредактировано, отправляем новое
+            except Exception as e:
+                logger.warning(f"Не удалось отредактировать сообщение: {e}")
                 await call.message.answer(
                     welcome_message,
-                    reply_markup=keyboard,
-                    parse_mode="Markdown"
+                    parse_mode="Markdown",
+                    reply_markup=keyboard
                 )
+            
+            logger.info(f"Пользователь {user_id} выбрал кафе: {cafe_name}")
+        else:
+            await call.answer("❌ Кафе не найдено")
+            logger.warning(f"Кафе {cafe_key} не найдено для пользователя {user_id}")
         
         await call.answer()
+        
     except Exception as e:
         logger.error(f"Ошибка в select_cafe: {e}")
-        await call.answer("Произошла ошибка. Пожалуйста, попробуйте снова.")
+        await call.answer("❌ Произошла ошибка при выборе кафе")
 
 @dp.callback_query(lambda c: c.data == "menu")
 async def show_categories(call: types.CallbackQuery):
     """Показать категории меню"""
-    user_id = call.from_user.id
-    ai_mode[user_id] = False
-    
     try:
+        user_id = call.from_user.id
+        ai_mode[user_id] = False
+        
         cafe_key = user_cafe[user_id]
         CATEGORIES, ALL_ITEMS, MENU_TEXT = load_menu(cafe_key)
         cafe_name = CAFES[cafe_key]["name"]
         
+        logger.info(f"Показ категорий для {cafe_name}, категорий: {len(CATEGORIES)}")
+        
         if not CATEGORIES:
-            await call.answer("⚠️ Меню временно недоступно")
+            await call.answer("⚠️ Меню пустое или недоступно")
             return
         
         keyboard = []
-        for i, category_name in enumerate(CATEGORIES.keys()):
-            # Создаем короткий callback_data с индексом категории
-            callback_data = f"cat:{i}"
+        for category_name in CATEGORIES.keys():
+            # Упрощаем создание callback_data
+            callback_data = f"category_{category_name[:30].replace(' ', '_')}"
             keyboard.append([InlineKeyboardButton(
                 text=f"🎯 {category_name}", 
                 callback_data=callback_data
@@ -193,52 +224,55 @@ async def show_categories(call: types.CallbackQuery):
             parse_mode="Markdown"
         )
         await call.answer()
+        
     except Exception as e:
         logger.error(f"Ошибка в show_categories: {e}")
-        await call.answer("Произошла ошибка. Пожалуйста, попробуйте снова.")
+        await call.answer("❌ Ошибка при загрузке меню")
 
-@dp.callback_query(lambda c: c.data.startswith("cat:"))
+@dp.callback_query(lambda c: c.data.startswith("category_"))
 async def show_category_items(call: types.CallbackQuery):
     """Показать товары в категории"""
-    user_id = call.from_user.id
-    ai_mode[user_id] = False
-    
     try:
+        user_id = call.from_user.id
+        ai_mode[user_id] = False
+        
         cafe_key = user_cafe[user_id]
         CATEGORIES, ALL_ITEMS, _ = load_menu(cafe_key)
         
-        if not CATEGORIES:
-            await call.answer("⚠️ Меню временно недоступно")
-            return
+        category_key = call.data[9:].replace('_', ' ')
+        logger.info(f"Показ товаров категории: {category_key}")
         
-        category_index = int(call.data.split(":")[1])
-        category_keys = list(CATEGORIES.keys())
+        # Ищем полное название категории
+        full_category_name = None
+        for cat_name in CATEGORIES.keys():
+            clean_name = ''.join([c for c in cat_name if not c in ['🍕', '🍝', '🥗', '🍹', '🍣', '🍱', '🍤', '🍵', '🍔', '🍟', '🥤', '🍦']]).strip()
+            if clean_name == category_key or cat_name == category_key:
+                full_category_name = cat_name
+                break
         
-        if category_index >= len(category_keys):
+        if not full_category_name or full_category_name not in CATEGORIES:
             await call.answer("❌ Категория не найдена")
             return
         
-        full_category_name = category_keys[category_index]
         items = CATEGORIES[full_category_name]
-        
         if not items:
-            await call.answer("❌ В этой категории пока нет товаров")
+            await call.answer("❌ В этой категории нет товаров")
             return
         
         keyboard = []
         items_list = list(items.items())
         
-        # Создаем кнопки товаров
+        # Кнопки товаров
         for i in range(0, len(items_list), 2):
             row = []
             for j in range(2):
                 if i + j < len(items_list):
                     item_name, price = items_list[i + j]
-                    # Создаем короткий callback_data
-                    item_key = f"{category_index}:{i+j}"
+                    # Упрощаем callback_data для товаров
+                    item_id = item_name[:20].replace(' ', '_')
                     row.append(InlineKeyboardButton(
                         text=f"{item_name}\n💎 {price}₽",
-                        callback_data=f"add:{item_key}"
+                        callback_data=f"add_{item_id}"
                     ))
             if row:
                 keyboard.append(row)
@@ -254,49 +288,41 @@ async def show_category_items(call: types.CallbackQuery):
             parse_mode="Markdown"
         )
         await call.answer()
+        
     except Exception as e:
         logger.error(f"Ошибка в show_category_items: {e}")
-        await call.answer("Произошла ошибка. Пожалуйста, попробуйте снова.")
+        await call.answer("❌ Ошибка при загрузке товаров")
 
-@dp.callback_query(lambda c: c.data.startswith("add:"))
+@dp.callback_query(lambda c: c.data.startswith("add_"))
 async def add_to_cart(call: types.CallbackQuery):
     """Добавить товар в корзину"""
-    user_id = call.from_user.id
     try:
+        user_id = call.from_user.id
         cafe_key = user_cafe[user_id]
         CATEGORIES, ALL_ITEMS, _ = load_menu(cafe_key)
         
-        if not ALL_ITEMS:
-            await call.answer("⚠️ Меню временно недоступно")
-            return
+        item_id = call.data[4:]  # Убираем "add_"
+        logger.info(f"Добавление товара {item_id} в корзину пользователя {user_id}")
         
-        # Получаем данные из callback_data
-        _, data = call.data.split(":")
-        category_index, item_index = map(int, data.split(":"))
+        # Ищем товар по ID или имени
+        item_name = None
+        for name in ALL_ITEMS.keys():
+            if name[:20].replace(' ', '_') == item_id or name == item_id:
+                item_name = name
+                break
         
-        # Находим товар
-        category_keys = list(CATEGORIES.keys())
-        if category_index >= len(category_keys):
+        if item_name and item_name in ALL_ITEMS:
+            user_cart[user_id].append({
+                "name": item_name, 
+                "price": ALL_ITEMS[item_name],
+                "cafe": cafe_key
+            })
+            await call.answer(f"✅ {item_name}\n🎉 Добавлено в корзину!")
+            logger.info(f"Товар {item_name} добавлен в корзину пользователя {user_id}")
+        else:
             await call.answer("❌ Товар не найден")
-            return
-        
-        category_name = category_keys[category_index]
-        category_items = list(CATEGORIES[category_name].items())
-        
-        if item_index >= len(category_items):
-            await call.answer("❌ Товар не найден")
-            return
-        
-        item_name, price = category_items[item_index]
-        
-        # Добавляем в корзину
-        user_cart[user_id].append({
-            "name": item_name, 
-            "price": price,
-            "cafe": cafe_key
-        })
-        
-        await call.answer(f"✅ {item_name}\n🎉 Добавлено в корзину!")
+            logger.warning(f"Товар {item_id} не найден для пользователя {user_id}")
+            
     except Exception as e:
         logger.error(f"Ошибка в add_to_cart: {e}")
         await call.answer("❌ Ошибка при добавлении в корзину")
@@ -304,16 +330,294 @@ async def add_to_cart(call: types.CallbackQuery):
 @dp.callback_query(lambda c: c.data == "cart")
 async def show_cart(call: types.CallbackQuery):
     """Показать корзину"""
-    user_id = call.from_user.id
-    ai_mode[user_id] = False
-    
     try:
+        user_id = call.from_user.id
+        ai_mode[user_id] = False
+        
         cart_items = user_cart[user_id]
         cafe_key = user_cafe[user_id]
         cafe_name = CAFES[cafe_key]["name"]
+        
+        logger.info(f"Показ корзины пользователя {user_id}, товаров: {len(cart_items)}")
         
         if not cart_items:
             text = f"""
 🏪 *{cafe_name}*
 
-🛒 *ВАША К
+🛒 *ВАША КОРЗИНА ПУСТА* 🛒
+
+💫 *Давайте наполним её вкусняшками!*
+🌟 *Выберите что-нибудь из нашего меню*
+"""
+            keyboard = [
+                [InlineKeyboardButton(text="📖 Перейти в меню", callback_data="menu")],
+                [InlineKeyboardButton(text="✨ AI-Помощник", callback_data="chat_mode")],
+                [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
+            ]
+        else:
+            total = sum(item["price"] for item in cart_items)
+            text = f"""
+🏪 *{cafe_name}*
+
+🛒 *ВАША КОРЗИНА:* 🛒
+"""
+            counts = {}
+            for item in cart_items:
+                name = item["name"]
+                counts[name] = counts.get(name, 0) + 1
+            
+            for name, cnt in counts.items():
+                price_per_item = next(item["price"] for item in cart_items if item["name"] == name)
+                total_price = price_per_item * cnt
+                text += f"├ {name}\n"
+                text += f"│   ✕{cnt} = {total_price}₽\n"
+            
+            text += f"\n💰 *ИТОГО: {total}₽* 💰"
+            
+            keyboard = [
+                [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")],
+                [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
+                [InlineKeyboardButton(text="📖 Продолжить покупки", callback_data="menu")],
+                [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
+            ]
+        
+        await call.message.edit_text(
+            text=text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
+            parse_mode="Markdown"
+        )
+        await call.answer()
+        
+    except Exception as e:
+        logger.error(f"Ошибка в show_cart: {e}")
+        await call.answer("❌ Ошибка при загрузке корзины")
+
+@dp.callback_query(lambda c: c.data == "clear_cart")
+async def clear_cart(call: types.CallbackQuery):
+    """Очистить корзину"""
+    try:
+        user_id = call.from_user.id
+        user_cart[user_id].clear()
+        logger.info(f"Корзина очищена для пользователя {user_id}")
+        await call.answer("🗑️ Корзина очищена")
+        await show_cart(call)
+    except Exception as e:
+        logger.error(f"Ошибка в clear_cart: {e}")
+        await call.answer("❌ Ошибка при очистке корзины")
+
+@dp.callback_query(lambda c: c.data == "checkout")
+async def checkout(call: types.CallbackQuery):
+    """Оформление заказа"""
+    try:
+        user_id = call.from_user.id
+        cart_items = user_cart[user_id].copy()
+        
+        if not cart_items:
+            await call.answer("❌ Корзина пуста")
+            return
+        
+        cafe_key = user_cafe[user_id]
+        cafe_name = CAFES[cafe_key]["name"]
+        total = sum(item["price"] for item in cart_items)
+        
+        logger.info(f"Оформление заказа для пользователя {user_id}, сумма: {total}₽")
+        
+        order_text = f"""
+🎊 *ЗАКАЗ ПРИНЯТ!* 🎊
+
+🏪 *Из:* {cafe_name}
+
+📦 *Ваш заказ:*
+"""
+        counts = {}
+        for item in cart_items:
+            name = item["name"]
+            counts[name] = counts.get(name, 0) + 1
+        
+        for name, cnt in counts.items():
+            price_per_item = next(item["price"] for item in cart_items if item["name"] == name)
+            total_price = price_per_item * cnt
+            order_text += f"├ {name}\n"
+            order_text += f"│   ✕{cnt} = {total_price}₽\n"
+        
+        order_text += f"\n💰 *СУММА ЗАКАЗА: {total}₽* 💰\n\n"
+        order_text += "⏰ *Менеджер свяжется с вами в ближайшее время!*\n"
+        order_text += "📞 *Ожидайте звонка!*"
+        
+        # Очищаем корзину после оформления
+        user_cart[user_id].clear()
+        
+        await call.message.edit_text(
+            text=order_text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🍽️ Сделать новый заказ", callback_data="menu")]
+            ]),
+            parse_mode="Markdown"
+        )
+        await call.answer("🎉 Заказ отправлен!")
+        
+    except Exception as e:
+        logger.error(f"Ошибка в checkout: {e}")
+        await call.answer("❌ Ошибка при оформлении заказа")
+
+@dp.callback_query(lambda c: c.data == "chat_mode")
+async def enable_chat_mode(call: types.CallbackQuery):
+    """Включить AI-помощника"""
+    try:
+        user_id = call.from_user.id
+        ai_mode[user_id] = True
+        cafe_key = user_cafe[user_id]
+        cafe_name = CAFES[cafe_key]["name"]
+        
+        await call.message.edit_text(
+            f"""
+🏪 *{cafe_name}*
+
+✨ *AI-ПОМОЩНИК АКТИВИРОВАН!* ✨
+
+💫 *Теперь просто напишите что хотите:*
+
+• 🍕 "2 пиццы и колу"
+• 🛒 "Покажи корзину" 
+• 🗑️ "Очисти корзину"
+• 💡 "Что посоветуешь?"
+• ❓ "Что популярного?"
+
+🎯 *Я всё пойму и помогу сделать заказ!* 🎯
+""",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📖 Вернуться в меню", callback_data="menu")],
+                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
+                [InlineKeyboardButton(text="❌ Выключить AI", callback_data="disable_ai")]
+            ]),
+            parse_mode="Markdown"
+        )
+        await call.answer("✨ AI-помощник включен!")
+        
+    except Exception as e:
+        logger.error(f"Ошибка в enable_chat_mode: {e}")
+        await call.answer("❌ Ошибка при включении AI")
+
+@dp.callback_query(lambda c: c.data == "disable_ai")
+async def disable_ai_mode(call: types.CallbackQuery):
+    """Выключить AI-помощника"""
+    try:
+        user_id = call.from_user.id
+        ai_mode[user_id] = False
+        cafe_key = user_cafe[user_id]
+        cafe_name = CAFES[cafe_key]["name"]
+        
+        await call.message.edit_text(
+            f"""
+🏪 *{cafe_name}*
+
+🤖 *AI-ПОМОЩНИК ОТКЛЮЧЁН* 🤖
+
+💫 *Используйте кнопки для навигации:* 💫
+""",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+                [InlineKeyboardButton(text="✨ Включить AI", callback_data="chat_mode")],
+                [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
+            ]),
+            parse_mode="Markdown"
+        )
+        await call.answer("❌ AI выключен")
+        
+    except Exception as e:
+        logger.error(f"Ошибка в disable_ai_mode: {e}")
+        await call.answer("❌ Ошибка при выключении AI")
+
+@dp.callback_query(lambda c: c.data == "change_cafe")
+async def change_cafe(call: types.CallbackQuery):
+    """Сменить кафе"""
+    try:
+        user_id = call.from_user.id
+        user_cart[user_id] = []
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🍝 Итальянское кафе", callback_data="cafe_italy")],
+            [InlineKeyboardButton(text="🍣 Суши-бар", callback_data="cafe_sushi")],
+            [InlineKeyboardButton(text="🍔 Бургер-хаус", callback_data="cafe_burger")],
+        ])
+        
+        await call.message.edit_text(
+            "🔄 *СМЕНА КАФЕ*\n\n🗑️ *Корзина очищена!*\n\n🎯 *Выберите новое кафе:*",
+            reply_markup=keyboard,
+            parse_mode="Markdown"
+        )
+        await call.answer()
+        
+    except Exception as e:
+        logger.error(f"Ошибка в change_cafe: {e}")
+        await call.answer("❌ Ошибка при смене кафе")
+
+@dp.message()
+async def handle_message(message: types.Message):
+    """Обработка текстовых сообщений"""
+    try:
+        user_id = message.from_user.id
+        text = message.text.strip()
+        
+        cafe_key = user_cafe[user_id]
+        _, ALL_ITEMS, _ = load_menu(cafe_key)
+        
+        logger.info(f"Сообщение от пользователя {user_id}: {text}, AI режим: {ai_mode.get(user_id, False)}")
+        
+        if ai_mode.get(user_id, False):
+            cart_items = user_cart[user_id]
+            cart_info = "🛒 пустая"
+            if cart_items:
+                total = sum(item["price"] for item in cart_items)
+                counts = {}
+                for item in cart_items:
+                    counts[item["name"]] = counts.get(item["name"], 0) + 1
+                cart_info = "🛒 " + ", ".join(f"{n}×{c}" for n, c in counts.items()) + f" → {total}₽"
+            
+            response = await ask_grok(text, cart_info, cafe_key, ALL_ITEMS)
+            
+            await message.answer(
+                f"✨ *AI-Помощник:*\n\n{response}",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+                    [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")],
+                    [InlineKeyboardButton(text="❌ Выключить AI", callback_data="disable_ai")]
+                ])
+            )
+        else:
+            await message.answer(
+                "🤔 *Не понял команду*\n\n💫 *Выберите способ заказа:*",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="📖 Меню", callback_data="menu")],
+                    [InlineKeyboardButton(text="✨ AI-Помощник", callback_data="chat_mode")],
+                    [InlineKeyboardButton(text="🔄 Сменить кафе", callback_data="change_cafe")]
+                ])
+            )
+            
+    except Exception as e:
+        logger.error(f"Ошибка в handle_message: {e}")
+        await message.answer("Произошла ошибка. Пожалуйста, попробуйте снова.")
+
+async def main():
+    """Основная функция запуска бота"""
+    try:
+        print("=" * 50)
+        print("🎊 БОТ ЗАПУЩЕН И ГОТОВ К РАБОТЕ! 🍽️")
+        print("✨ Красивое меню активировано!")
+        print("🤖 AI-помощник готов помочь!")
+        print(f"📊 Доступные кафе: {', '.join(CAFES.keys())}")
+        print("=" * 50)
+        
+        logger.info("Бот запущен успешно")
+        await dp.start_polling(bot)
+        
+    except Exception as e:
+        logger.error(f"Критическая ошибка при запуске бота: {e}")
+        print(f"❌ Критическая ошибка: {e}")
+    finally:
+        await bot.session.close()
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
