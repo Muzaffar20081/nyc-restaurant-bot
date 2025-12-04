@@ -1,27 +1,20 @@
 BOT_TOKEN = "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE"
-
 CAFES = {
     "italy": {
-        "name": "🍝 Итальянское кафе 'Белла Италия'",
-        "menu_file": "menus.italy_menu",
-        "photo": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTY2yRuUqwKS7cDn8dzcs24WPvrySIka568fA&s",  # Замени на реальные фото
-        "color": "🟡"  # Желтый для Италии
+        "name": "🍝 Итальянское кафе 'Рома'",
+        "menu_file": "menus.italian_menu",
+        "photo": "https://via.placeholder.com/600x400/FF6B6B/FFFFFF?text=Italian+Cafe"
     },
     "sushi": {
-        "name": "🍣 Суши-бар 'Токио'", 
+        "name": "🍣 Суши-бар 'Токио'",
         "menu_file": "menus.sushi_menu",
-        "photo": "https://womanvip.ru/wp-content/uploads/2017/05/rolli7.jpg",
-        "color": "🔵"  # Синий для суши
+        "photo": "https://via.placeholder.com/600x400/4ECDC4/FFFFFF?text=Sushi+Bar"
     },
     "burger": {
-        "name": "🍔 Бургер-хаус 'Гриль Мастер'",
-        "menu_file": "menus.burger_menu", 
-        "photo": "https://example.com/burger.jpg",
-        "color": "🔴"  # Красный для бургеров
+        "name": "🍔 Бургер-хаус 'Техас'",
+        "menu_file": "menus.burger_menu",
+        "photo": "https://via.placeholder.com/600x400/45B7D1/FFFFFF?text=Burger+House"
     }
 }
 
 DEFAULT_CAFE = "italy"
-
-
-
