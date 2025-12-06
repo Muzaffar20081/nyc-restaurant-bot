@@ -1,241 +1,217 @@
 import asyncio
 import logging
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.fsm.storage.memory import MemoryStorage
+import datetime
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ReplyKeyboardRemove
 
 # Импортируем наши модули
-from config import BOT_TOKEN, ADMIN_IDS, CAFES
+from config import BOT_TOKEN, ADMIN_IDS, CAFES, DEFAULT_CAFE
 from admin_panel import (
     show_admin_panel, 
     admin_view_menu,
     admin_add_item_step1,
-    admin_edit_price_step1,
-    admin_delete_item_step1,
-    admin_back,
+    admin_add_item_step2,
     admin_add_item_step3,
     admin_add_item_step4,
-    admin_create_new_category,
+    admin_add_item_final,
+    admin_create_new_category_for_item,
+    admin_save_new_category_with_item,
+    admin_edit_price_step1,
+    admin_edit_price_step2,
     admin_edit_price_final,
-    AdminStates
+    admin_delete_item_step1,
+    admin_delete_item_step2,
+    admin_delete_item_final,
+    admin_add_category,
+    admin_add_category_step2,
+    admin_save_new_category,
+    admin_back,
+    AdminStates,
+    load_menus
 )
 
 # Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 # Инициализация бота
-bot = Bot(token=BOT_TOKEN)
+bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
 dp = Dispatcher(storage=MemoryStorage())
 
-# Проверка админа
+# Хранилище состояний пользователей
+user_states = {}
+
+# ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============
+
 def is_admin(user_id: int) -> bool:
+    """Проверка, является ли пользователь администратором"""
     return user_id in ADMIN_IDS
 
-# ============ ОСНОВНЫЕ КОМАНДЫ ============
+def get_current_time():
+    """Получить текущее время в формате HH:MM"""
+    now = datetime.datetime.now()
+    return now.strftime("%H:%M")
+
+def create_user_keyboard(is_admin_user=False):
+    """Создание клавиатуры для пользователя"""
+    if is_admin_user:
+        keyboard = types.ReplyKeyboardMarkup(
+            keyboard=[
+                [types.KeyboardButton(text="🍽️ Меню")],
+                [types.KeyboardButton(text="🤖 AI-помощник")],
+                [types.KeyboardButton(text="🏪 Сменить кафе")],
+                [types.KeyboardButton(text="🔧 Админ-панель")]
+            ],
+            resize_keyboard=True,
+            input_field_placeholder="Выберите действие..."
+        )
+    else:
+        keyboard = types.ReplyKeyboardMarkup(
+            keyboard=[
+                [types.KeyboardButton(text="🍽️ Меню")],
+                [types.KeyboardButton(text="🤖 AI-помощник")],
+                [types.KeyboardButton(text="🏪 Сменить кафе")]
+            ],
+            resize_keyboard=True,
+            input_field_placeholder="Выберите действие..."
+        )
+    return keyboard
+
+# ============ КОМАНДЫ БОТА ============
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     """Команда /start"""
-    if is_admin(message.from_user.id):
-        keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="👤 Меню пользователя", callback_data="user_menu")],
-            [types.InlineKeyboardButton(text="🔧 Админ-панель", callback_data="admin_panel")]
-        ])
-        text = "👋 Добро пожаловать!\n\nВы администратор. Выберите режим:"
-    else:
-        keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-            [types.InlineKeyboardButton(text="🍽️ Меню", callback_data="show_menu")],
-            [types.InlineKeyboardButton(text="🤖 AI-помощник", callback_data="ai_helper")],
-            [types.InlineKeyboardButton(text="🏪 Сменить кафе", callback_data="change_cafe")]
-        ])
-        text = "👋 Добро пожаловать в наш ресторан!\n\nВыберите действие:"
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
     
-    await message.answer(text, reply_markup=keyboard)
+    # Сохраняем выбранное кафе по умолчанию
+    user_states[user_id] = {"cafe": DEFAULT_CAFE}
+    
+    welcome_text = (
+        f"👋 Привет, {first_name}!\n\n"
+        f"Добро пожаловать в наш ресторан! 🍽️\n\n"
+        f"Я помогу вам:\n"
+        f"• 📋 Посмотреть меню\n"
+        f"• 🤖 Получить рекомендации\n"
+        f"• 🏪 Выбрать кафе\n"
+        f"• 🛒 Сделать заказ\n\n"
+        f"*Выберите действие снизу или напишите команду:*"
+    )
+    
+    keyboard = create_user_keyboard(is_admin(user_id))
+    
+    await message.answer(
+        welcome_text,
+        reply_markup=keyboard
+    )
+
+@dp.message(Command("help"))
+async def cmd_help(message: types.Message):
+    """Команда /help"""
+    help_text = (
+        "🆘 *Помощь по боту:*\n\n"
+        "📋 *Основные команды:*\n"
+        "• /start - начать работу с ботом\n"
+        "• /menu - показать меню текущего кафе\n"
+        "• /cafe - выбрать кафе\n"
+        "• /admin - панель управления (только для админов)\n"
+        "• /myid - узнать свой ID\n\n"
+        "📱 *Быстрые действия (кнопки снизу):*\n"
+        "• 🍽️ Меню - посмотреть меню\n"
+        "• 🤖 AI-помощник - получить рекомендации\n"
+        "• 🏪 Сменить кафе - выбрать другое кафе\n"
+        "• 🔧 Админ-панель - управление меню\n\n"
+        "*Также вы можете просто писать текстом:*\n"
+        "• 'меню' - показать меню\n"
+        "• 'помощник' - AI-помощник\n"
+        "• 'кафе' - сменить кафе\n"
+        "• 'админ' - админ-панель"
+    )
+    
+    await message.answer(help_text, parse_mode="Markdown")
+
+@dp.message(Command("menu"))
+async def cmd_menu(message: types.Message):
+    """Команда /menu - показать меню"""
+    await show_user_menu(message)
+
+@dp.message(Command("cafe"))
+async def cmd_cafe(message: types.Message):
+    """Команда /cafe - выбрать кафе"""
+    await change_cafe_keyboard(message)
 
 @dp.message(Command("admin"))
 async def cmd_admin(message: types.Message):
-    """Команда /admin - только для админов"""
+    """Команда /admin - админ-панель"""
     if not is_admin(message.from_user.id):
-        await message.answer("❌ У вас нет доступа к админ-панели")
+        await message.answer(
+            "❌ *Доступ запрещен!*\n\n"
+            "У вас нет прав для доступа к админ-панели.",
+            parse_mode="Markdown"
+        )
         return
     
     await show_admin_panel(message, CAFES)
 
-# ============ АДМИН ПАНЕЛЬ CALLBACKS ============
-
-@dp.callback_query(lambda call: call.data.startswith("admin_"))
-async def handle_admin_callbacks(call: types.CallbackQuery, state: FSMContext):
-    """Обработка всех callback от админ-панели"""
-    user_id = call.from_user.id
-    if not is_admin(user_id):
-        await call.answer("❌ Нет доступа", show_alert=True)
-        return
+@dp.message(Command("myid"))
+async def cmd_myid(message: types.Message):
+    """Команда /myid - узнать свой ID"""
+    user_id = message.from_user.id
+    username = message.from_user.username or "не установлен"
+    first_name = message.from_user.first_name or ""
+    last_name = message.from_user.last_name or ""
     
-    # Получаем данные из call.data
-    data = call.data
+    admin_status = "✅ Администратор" if is_admin(user_id) else "👤 Пользователь"
     
-    if data == "admin_panel":
-        await show_admin_panel(call.message, CAFES)
-    
-    elif data == "admin_view_menu":
-        await admin_view_menu(call, CAFES)
-    
-    elif data == "admin_add_item":
-        await admin_add_item_step1(call, CAFES, state)
-    
-    elif data == "admin_edit_price":
-        await admin_edit_price_step1(call, CAFES)
-    
-    elif data == "admin_delete_item":
-        await admin_delete_item_step1(call, CAFES)
-    
-    elif data == "admin_back":
-        await admin_back(call, CAFES)
-    
-    elif data == "admin_add_category":
-        # Простая команда для добавления категории
-        from admin_panel import admin_add_category
-        await admin_add_category(call.message, CAFES)
-    
-    elif data.startswith("add_to_"):
-        await admin_add_item_step2(call, state)
-    
-    elif data.startswith("cat_"):
-        await admin_add_item_final(call, state)
-    
-    elif data == "new_category":
-        await call.message.answer("📝 Введите название новой категории:")
-        # Состояние уже установлено в admin_add_item_step4
-    
-    elif data.startswith("edit_price_"):
-        await admin_edit_price_step2(call, state)
-    
-    elif data.startswith("delete_"):
-        await admin_delete_item_step2(call)
-    
-    elif data.startswith("confirm_delete_"):
-        await admin_delete_item_final(call)
-    
-    else:
-        await call.answer("❌ Неизвестная команда", show_alert=True)
-
-# ============ FSM ХЕНДЛЕРЫ ДЛЯ АДМИНКИ ============
-
-@dp.message(AdminStates.waiting_for_item_name)
-async def handle_item_name(message: types.Message, state: FSMContext):
-    """Обработка названия товара"""
-    await admin_add_item_step3(message, state)
-
-@dp.message(AdminStates.waiting_for_item_price)
-async def handle_item_price(message: types.Message, state: FSMContext):
-    """Обработка цены товара"""
-    await admin_add_item_step4(message, state, CAFES)
-
-@dp.message(AdminStates.waiting_for_new_price)
-async def handle_new_price(message: types.Message, state: FSMContext):
-    """Обработка новой цены"""
-    await admin_edit_price_final(message, state)
-
-@dp.message(AdminStates.waiting_for_category)
-async def handle_new_category(message: types.Message, state: FSMContext):
-    """Обработка новой категории"""
-    await admin_create_new_category(message, state)
-
-# ============ ПОЛЬЗОВАТЕЛЬСКИЙ ИНТЕРФЕЙС ============
-
-@dp.callback_query(lambda call: call.data == "show_menu")
-async def show_user_menu(call: types.CallbackQuery):
-    """Показать меню пользователю"""
-    from admin_panel import load_menus
-    
-    menus = load_menus()
-    cafe_key = "italy"  # Можно сделать выбор кафе
-    
-    if cafe_key not in menus or not menus[cafe_key]["CATEGORIES"]:
-        await call.message.edit_text("📭 Меню пока пустое. Зайдите позже!")
-        return
-    
-    cafe_name = CAFES.get(cafe_key, {}).get("name", "Кафе")
-    text = f"🍽️ *Меню {cafe_name}:*\n\n"
-    
-    for cat_name, items in menus[cafe_key]["CATEGORIES"].items():
-        text += f"📁 *{cat_name}:*\n"
-        for item_name, price in items.items():
-            text += f"   ├ {item_name} - {price}₽\n"
-        text += "\n"
-    
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="🛒 Добавить в корзину", callback_data="add_to_cart_ask")],
-        [types.InlineKeyboardButton(text="🏪 Сменить кафе", callback_data="change_cafe")],
-        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="user_menu")]
-    ])
-    
-    await call.message.edit_text(text, parse_mode="Markdown", reply_markup=keyboard)
-
-@dp.callback_query(lambda call: call.data == "ai_helper")
-async def show_ai_helper(call: types.CallbackQuery):
-    """AI-помощник"""
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="❓ Что посоветуете?", callback_data="ai_recommend")],
-        [types.InlineKeyboardButton(text="🍽️ Составить заказ", callback_data="ai_order")],
-        [types.InlineKeyboardButton(text="🔙 Назад", callback_data="user_menu")]
-    ])
-    
-    await call.message.edit_text(
-        "🤖 *AI-Помощник*\n\nЧем могу помочь?",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
-
-@dp.callback_query(lambda call: call.data == "change_cafe")
-async def change_cafe(call: types.CallbackQuery):
-    """Смена кафе"""
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text=cafe["name"], callback_data=f"select_cafe_{cafe_key}")]
-        for cafe_key, cafe in CAFES.items()
-    ] + [[types.InlineKeyboardButton(text="🔙 Назад", callback_data="user_menu")]]
-    )
-    
-    await call.message.edit_text(
-        "🏪 *Выберите кафе:*",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
-
-@dp.callback_query(lambda call: call.data.startswith("select_cafe_"))
-async def select_cafe(call: types.CallbackQuery):
-    """Выбор кафе"""
-    cafe_key = call.data.replace("select_cafe_", "")
-    cafe_name = CAFES.get(cafe_key, {}).get("name", "Кафе")
-    
-    await call.message.edit_text(
-        f"✅ Выбрано: {cafe_name}\n\nТеперь можете посмотреть меню.",
+    await message.answer(
+        f"📋 *Ваши данные:*\n\n"
+        f"🆔 *ID:* `{user_id}`\n"
+        f"👤 *Имя:* {first_name} {last_name}\n"
+        f"📛 *Username:* @{username}\n"
+        f"👑 *Статус:* {admin_status}\n\n"
+        f"*Текущее время:* {get_current_time()}",
         parse_mode="Markdown"
     )
-    # Здесь можно сохранить выбор кафе в состояние пользователя
 
-@dp.callback_query(lambda call: call.data == "user_menu")
-async def user_menu(call: types.CallbackQuery):
-    """Главное меню пользователя"""
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[
-        [types.InlineKeyboardButton(text="🍽️ Меню", callback_data="show_menu")],
-        [types.InlineKeyboardButton(text="🤖 AI-помощник", callback_data="ai_helper")],
-        [types.InlineKeyboardButton(text="🏪 Сменить кафе", callback_data="change_cafe")]
-    ])
+# ============ ТЕКСТОВЫЕ КОМАНДЫ (кнопки и текст) ============
+
+@dp.message(F.text.lower().in_(["меню", "menu", "🍽️ меню"]))
+async def text_menu(message: types.Message):
+    """Текстовая команда 'меню'"""
+    await show_user_menu(message)
+
+@dp.message(F.text.lower().in_(["ai-помощник", "ai помощник", "помощник", "🤖 ai-помощник", "бот", "помоги"]))
+async def text_ai_helper(message: types.Message):
+    """Текстовая команда 'ai-помощник'"""
+    await show_ai_helper(message)
+
+@dp.message(F.text.lower().in_(["сменить кафе", "кафе", "🏪 сменить кафе", "ресторан", "заведение"]))
+async def text_change_cafe(message: types.Message):
+    """Текстовая команда 'сменить кафе'"""
+    await change_cafe_keyboard(message)
+
+@dp.message(F.text.lower().in_(["админ", "admin", "🔧 админ-панель", "админка", "управление"]))
+async def text_admin(message: types.Message):
+    """Текстовая команда 'админ'"""
+    if not is_admin(message.from_user.id):
+        await message.answer(
+            "❌ *Доступ запрещен!*\n\n"
+            "У вас нет прав для доступа к админ-панели.",
+            parse_mode="Markdown"
+        )
+        return
     
-    await call.message.edit_text(
-        "👤 *Меню пользователя*\n\nВыберите действие:",
-        parse_mode="Markdown",
-        reply_markup=keyboard
-    )
+    await show_admin_panel(message, CAFES)
 
-# ============ ЗАПУСК БОТА ============
+# ============ ОСНОВНЫЕ ФУНКЦИИ ============
 
-async def main():
-    logger.info("Запуск бота...")
-    await dp.start_polling(bot)
-
-if __name__ == "__main__":
-    asyncio.run(main())
+async def show_user_menu(message: types.Message):
+    """Показать меню пользователю"""
+    user_id = message.from_user.id
