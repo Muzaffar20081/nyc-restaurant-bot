@@ -1,9 +1,10 @@
 BOT_TOKEN = "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE"
+ADMIN_IDS = [6056106251]  # Ваш Telegram ID
 
 CAFES = {
     "italy": {
         "name": "🍝 Итальянское кафе 'Рома'",
-        "photo": ""  # Можно оставить пустым или добавить ссылку
+        "photo": ""
     },
     "sushi": {
         "name": "🍣 Суши-бар 'Токио'",
@@ -16,6 +17,3 @@ CAFES = {
 }
 
 DEFAULT_CAFE = "italy"
-ADMIN_IDS = [6056106251]  # Ваш Telegram ID
-
-
