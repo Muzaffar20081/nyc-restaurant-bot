@@ -17,3 +17,4 @@ CAFES = {
 }
 
 DEFAULT_CAFE = "italy"
+
