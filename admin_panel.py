@@ -615,3 +615,4 @@ async def admin_save_new_category(message: types.Message, state: FSMContext, caf
 async def admin_back(call: types.CallbackQuery, cafes_config):
     """Вернуться в админ-панель"""
     await show_admin_panel(call.message, cafes_config)
+
