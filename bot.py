@@ -1,262 +1,102 @@
-# bot.py — ФИНАЛЬНАЯ КРАСИВАЯ ВЕРСИЯ С ФОТО, КОРЗИНОЙ И ЗАКАЗОМ
+# bot.py — ФИНАЛЬНЫЙ РАБОЧИЙ КОД 2025 (использует твои файлы)
+import asyncio
 import os
 from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import CommandStart
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputMediaPhoto
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from ai_brain import ask_ai  # ← твой AI
+from database import load_restaurants  # ← твоя база
+
+# Загружаем рестораны
+restaurants = load_restaurants()
+current_menu = restaurants[0]["menu"] if restaurants else {}  # берём первый ресторан
 
 bot = Bot(token=os.getenv("BOT_TOKEN"))
 dp = Dispatcher()
 
 user_cart = defaultdict(list)
 
-# Ссылки на фото (твои или мои — можно менять)
-PHOTOS = {
-    "start": "https://i.ibb.co/m9kJ7B/welcome-burger.png",
-    "menu": "https://i.ibb.co/m9kJ7B/welcome-burger.png",
-    "cart": "https://i.ibb.co/m9kJ7B/welcome-burger.png"
-}
+def get_cart_text(uid):
+    if not user_cart[uid]:
+        return "*Корзина пустая*"
+    total = sum(item["price"] * item["qty"] for item in user_cart[uid])
+    text = "*Твоя корзина:*\n\n"
+    for item in user_cart[uid]:
+        text += f"• {item['name']} × {item['qty']} = {item['price']*item['qty']}₽\n"
+    text += f"\n*Итого: {total}₽*"
+    return text
 
-# Цены (можно потом вынести в JSON)
-PRICES = {
-    "Воппер": 349,
-    "Двойной Воппер": 449,
-    "Картошка": 149,
-    "Кола": 119,
-    "Чизбургер": 199,
-    "Наггетсы": 179
-}
+def add_to_cart(uid, text):
+    text = text.lower()
+    added = []
+    for name, price in current_menu.items():
+        if name.lower() in text:
+            found = False
+            for item in user_cart[uid]:
+                if item["name"] == name:
+                    item["qty"] += 1
+                    found = True
+                    break
+            if not found:
+                user_cart[uid].append({"name": name, "price": price, "qty": 1})
+            added.append(name.title())
+    return added
 
 @dp.message(CommandStart())
 async def start(message: types.Message):
-    try:
-        await message.answer_photo(
-            photo=PHOTOS["start"],
-            caption=f"Здарова, {message.from_user.first_name}!\n\n*BURGER KING 2025 ЖИВОЙ НА МАКСИМАЛКАХ*",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
-            ]),
-            parse_mode="Markdown"
-        )
-    except Exception as e:
-        await message.answer(
-            f"Здарова, {message.from_user.first_name}!\n\n*BURGER KING 2025 ЖИВОЙ* (фото не загрузилось)",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Меню", callback_data="menu")],
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
-            ]),
-            parse_mode="Markdown"
-        )
+    await message.answer_photo(
+        "https://i.ibb.co/m9kJ7B/welcome-burger.png",
+        caption=f"Здарова, {message.from_user.first_name}!\n\n*BURGER KING 2025 — НА МАКСИМАЛКАХ*",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Меню", callback_data="menu")],
+            [InlineKeyboardButton(text="Корзина", callback_data="cart")]
+        ])
+    )
 
 @dp.callback_query(lambda c: c.data == "menu")
-async def menu(call: types.CallbackQuery):
-    try:
-        await call.message.edit_media(
-            media=InputMediaPhoto(
-                media=PHOTOS["menu"],
-                caption="*🍔 МЕНЮ BURGER KING 2025*\n\n"
-                        "Воппер — 349₽\n"
-                        "Двойной Воппер — 449₽\n"
-                        "Картошка — 149₽\n"
-                        "Кола — 119₽\n"
-                        "Чизбургер — 199₽\n"
-                        "Наггетсы — 179₽\n\n"
-                        "Нажми на кнопку — добавлю в корзину!",
-                parse_mode="Markdown"
-            ),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Воппер", callback_data="add_Воппер")],
-                [InlineKeyboardButton(text="🍔 Двойной Воппер", callback_data="add_Двойной Воппер")],
-                [InlineKeyboardButton(text="🍟 Картошка", callback_data="add_Картошка")],
-                [InlineKeyboardButton(text="🥤 Кола", callback_data="add_Кола")],
-                [InlineKeyboardButton(text="🍔 Чизбургер", callback_data="add_Чизбургер")],
-                [InlineKeyboardButton(text="🍗 Наггетсы", callback_data="add_Наггетсы")],
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
-            ])
-        )
-    except Exception as e:
-        await call.message.edit_text(
-            text="*🍔 МЕНЮ BURGER KING 2025*\n\n"
-                 "Воппер — 349₽\n"
-                 "Двойной Воппер — 449₽\n"
-                 "Картошка — 149₽\n"
-                 "Кола — 119₽\n"
-                 "Чизбургер — 199₽\n"
-                 "Наггетсы — 179₽\n\n"
-                 "Нажми на кнопку — добавлю в корзину!",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Воппер", callback_data="add_Воппер")],
-                [InlineKeyboardButton(text="🍔 Двойной Воппер", callback_data="add_Двойной Воппер")],
-                [InlineKeyboardButton(text="🍟 Картошка", callback_data="add_Картошка")],
-                [InlineKeyboardButton(text="🥤 Кола", callback_data="add_Кола")],
-                [InlineKeyboardButton(text="🍔 Чизбургер", callback_data="add_Чизбургер")],
-                [InlineKeyboardButton(text="🍗 Наггетсы", callback_data="add_Наггетсы")],
-                [InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")]
-            ]),
-            parse_mode="Markdown"
-        )
+async def show_menu(call: types.CallbackQuery):
+    menu_text = "*МЕНЮ:*\n\n" + "\n".join([f"{name} — {price}₽" for name, price in current_menu.items()])
+    await call.message.edit_caption(
+        caption=menu_text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Корзина", callback_data="cart")]])
+    )
     await call.answer()
-
-@dp.callback_query(lambda c: c.data.startswith("add_"))
-async def add_to_cart(call: types.CallbackQuery):
-    item_name = call.data[4:]
-    prices = {
-        "Воппер": 349,
-        "Двойной Воппер": 449,
-        "Картошка": 149,
-        "Кола": 119,
-        "Чизбургер": 199,
-        "Наггетсы": 179
-    }
-   
-    if item_name in prices:
-        user_cart[call.from_user.id].append({
-            "name": item_name,
-            "price": prices[item_name]
-        })
-        await call.answer(f"✅ {item_name} добавлен в корзину!")
-    else:
-        await call.answer("❌ Товар не найден")
-    await call.message.edit_reply_markup(reply_markup=None)  # убираем кнопки после добавления
 
 @dp.callback_query(lambda c: c.data == "cart")
-async def cart(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    cart_items = user_cart[user_id]
-   
-    if not cart_items:
-        caption = "*🛒 Корзина пуста, брат!*\n\nЗайди в меню и выбери что-нибудь вкусненькое 🍔"
-        keyboard = [[InlineKeyboardButton(text="🍔 Меню", callback_data="menu")]]
-    else:
-        total = sum(item["price"] for item in cart_items)
-        caption = "*🛒 Твоя корзина:*\n\n"
-       
-        # Группируем одинаковые товары
-        item_counts = {}
-        for item in cart_items:
-            name = item["name"]
-            if name in item_counts:
-                item_counts[name] += 1
-            else:
-                item_counts[name] = 1
-       
-        for name, count in item_counts.items():
-            price = next(item["price"] for item in cart_items if item["name"] == name)
-            caption += f"• {name} ×{count} — {price * count}₽\n"
-       
-        caption += f"\n💵 *Итого: {total}₽*"
-       
-        keyboard = [
-            [InlineKeyboardButton(text="🧹 Очистить корзину", callback_data="clear_cart")],
-            [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
-            [InlineKeyboardButton(text="🍔 Продолжить покупки", callback_data="menu")]
-        ]
-   
-    try:
-        await call.message.edit_media(
-            media=InputMediaPhoto(
-                media=PHOTOS["cart"],
-                caption=caption,
-                parse_mode="Markdown"
-            ),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard)
-        )
-    except:
-        await call.message.edit_text(
-            text=caption,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard),
-            parse_mode="Markdown"
-        )
+async def show_cart(call: types.CallbackQuery):
+    await call.message.edit_caption(
+        caption=get_cart_text(call.from_user.id),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Очистить", callback_data="clear")],
+            [InlineKeyboardButton(text="Меню", callback_data="menu")]
+        ])
+    )
     await call.answer()
 
-@dp.callback_query(lambda c: c.data == "clear_cart")
+@dp.callback_query(lambda c: c.data == "clear")
 async def clear_cart(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    user_cart[user_id] = []
-    await call.answer("🧹 Корзина очищена!")
-    await cart(call)
-
-@dp.callback_query(lambda c: c.data == "checkout")
-async def checkout(call: types.CallbackQuery):
-    user_id = call.from_user.id
-    cart_items = user_cart[user_id]
-   
-    if not cart_items:
-        await call.answer("❌ Корзина пуста!")
-        return
-   
-    total = sum(item["price"] for item in cart_items)
-   
-    # Очищаем корзину после заказа
-    user_cart[user_id] = []
-   
-    order_text = f"✅ *Заказ принят!*\n\n"
-    for item in cart_items:
-        order_text += f"• {item['name']} — {item['price']}₽\n"
-    order_text += f"\n💵 Сумма: {total}₽\n📱 Статус: принят\n\nОжидай уведомление о готовности!"
-   
-    try:
-        await call.message.edit_media(
-            media=InputMediaPhoto(
-                media=PHOTOS["start"],
-                caption=order_text,
-                parse_mode="Markdown"
-            ),
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Новый заказ", callback_data="menu")]
-            ])
-        )
-    except:
-        await call.message.edit_text(
-            text=order_text,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Новый заказ", callback_data="menu")]
-            ]),
-            parse_mode="Markdown"
-        )
-    await call.answer()
+    user_cart[call.from_user.id].clear()
+    await call.answer("Корзина очищена!", show_alert=True)
+    await show_cart(call)
 
 @dp.message()
-async def handle_text(message: types.Message):
+async def handle_message(message: types.Message):
     if not message.text:
         return
-    text = message.text.strip()
-    prices = {
-        "Воппер": 349, "Двойной Воппер": 449, "Картошка": 149,
-        "Кола": 119, "Чизбургер": 199, "Наггетсы": 179
-    }
-   
-    if text in prices:
-        user_id = message.from_user.id
-        user_cart[user_id].append({
-            "name": text,
-            "price": prices[text]
-        })
-        await message.answer(f"✅ {text} добавлен в корзину!")
-       
-        # Показываем кнопку для просмотра корзины
-        cart_items = user_cart[user_id]
-        total = sum(item["price"] for item in cart_items)
-       
-        await message.answer(
-            f"*🛒 В корзине товаров на {total}₽*\n\nНажми кнопку ниже чтобы посмотреть детали:",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🛒 Посмотреть корзину", callback_data="cart")]
-            ]),
-            parse_mode="Markdown"
-        )
-    else:
-        await message.answer(
-            "Не понял тебя, брат! Используй кнопки 👇",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🍔 Открыть меню", callback_data="menu")]
-            ])
-        )
+
+    added = add_to_cart(message.from_user.id, message.text)
+    if added:
+        await message.answer(f"Добавил: {', '.join(added)}!\n\n{get_cart_text(message.from_user.id)}")
+        return
+
+    # Если не заказ — спрашиваем у твоего AI
+    ai_response = await ask_ai(message.text)
+    await message.answer(ai_response)
 
 async def main():
+    print("БОТ ЗАПУЩЕН — САМЫЙ КРУТОЙ В РОССИИ!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    import asyncio
     asyncio.run(main())
