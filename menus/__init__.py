@@ -1,22 +1,34 @@
-# menus/__init__.py
-from .burger_menu import ALL_ITEMS as BURGER_ITEMS, MENU_TEXT as BURGER_TEXT
-from .italy_menu import ALL_ITEMS as ITALY_ITEMS, MENU_TEXT as ITALY_TEXT
-from .sushi_menu import ALL_ITEMS as SUSHI_ITEMS, MENU_TEXT as SUSHI_TEXT
+# menu/__init__.py
+from .burger_menu import BURGER_MENU
+from .italy_menu import ITALY_MENU
+from .sushi_menu import SUSHI_MENU
 
-MENU_BY_CUISINE = {
-    "burgers": {
-        "name": "🍔 Бургер-хоус",
-        "items": BURGER_ITEMS,
-        "text": BURGER_TEXT
-    },
-    "italy": {
-        "name": "🍕 Итальянская кухня",
-        "items": ITALY_ITEMS,
-        "text": ITALY_TEXT
-    },
-    "sushi": {
-        "name": "🍣 Суши-бар Токио",
-        "items": SUSHI_ITEMS,
-        "text": SUSHI_TEXT
-    }
+# Объединяем все меню в один словарь
+ALL_MENUS = {
+    "burgers": BURGER_MENU,
+    "pizza": ITALY_MENU,
+    "sushi": SUSHI_MENU,
 }
+
+# Категории для отображения
+MENU_CATEGORIES = [
+    {"id": "burgers", "name": "🍔 Бургеры", "emoji": "🍔"},
+    {"id": "pizza", "name": "🍕 Пицца", "emoji": "🍕"},
+    {"id": "sushi", "name": "🍣 Суши", "emoji": "🍣"},
+]
+
+def get_menu_by_category(category_id):
+    """Получить меню по категории"""
+    return ALL_MENUS.get(category_id, [])
+
+def get_all_categories():
+    """Получить все категории меню"""
+    return MENU_CATEGORIES
+
+def find_item_by_id(item_id):
+    """Найти товар по ID во всех меню"""
+    for category in ALL_MENUS.values():
+        for item in category:
+            if item.get("id") == item_id:
+                return item
+    return None
