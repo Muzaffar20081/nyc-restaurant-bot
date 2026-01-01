@@ -1,8 +1,9 @@
-# simple_bot.py - МИНИМАЛЬНЫЙ РАБОЧИЙ БОТ
+# bot.py — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ
 import asyncio
 import os
 import sys
 import logging
+from collections import defaultdict
 
 # Добавляем текущую директорию в путь
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,10 +16,19 @@ from aiogram.enums import ParseMode
 # Импортируем config
 try:
     from config import BOT_TOKEN, CUISINES
-    print(f"✅ Токен загружен: {BOT_TOKEN[:10]}...")
-except ImportError:
-    print("❌ Ошибка: файл config.py не найден или не содержит BOT_TOKEN")
+    print(f"✅ Конфиг загружен")
+except ImportError as e:
+    print(f"❌ Ошибка загрузки config.py: {e}")
     sys.exit(1)
+
+# Пробуем импортировать меню
+try:
+    from menu import get_menu_by_category, find_item_by_id, search_items
+    print(f"✅ Меню загружено")
+    USE_REAL_MENU = True
+except ImportError:
+    print("⚠️  Меню не загружено, используется тестовое меню")
+    USE_REAL_MENU = False
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +38,10 @@ logger = logging.getLogger(__name__)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Простое меню для теста
+# Корзина пользователей
+user_cart = defaultdict(list)
+
+# Тестовое меню (на случай если real menu не загрузится)
 TEST_MENU = {
     "burgers": [
         {"id": "whopper", "name": "Воппер", "price": 299, "description": "Классический бургер", "category": "burgers"},
@@ -44,8 +57,37 @@ TEST_MENU = {
     ]
 }
 
-# Корзина
-user_cart = {}
+def get_items_by_category(category_id):
+    """Получить товары категории"""
+    if USE_REAL_MENU:
+        return get_menu_by_category(category_id)
+    else:
+        return TEST_MENU.get(category_id, [])
+
+def find_item(item_id):
+    """Найти товар по ID"""
+    if USE_REAL_MENU:
+        return find_item_by_id(item_id)
+    else:
+        # Ищем в тестовом меню
+        for cat_items in TEST_MENU.values():
+            for item in cat_items:
+                if item["id"] == item_id:
+                    return item
+        return None
+
+def search_items_in_menu(query):
+    """Поиск товаров"""
+    if USE_REAL_MENU:
+        return search_items(query)
+    else:
+        results = []
+        query_lower = query.lower()
+        for cat_items in TEST_MENU.values():
+            for item in cat_items:
+                if query_lower in item["name"].lower():
+                    results.append(item)
+        return results
 
 def create_main_keyboard():
     """Создает главную клавиатуру"""
@@ -75,7 +117,6 @@ def create_main_keyboard():
 async def start(message: types.Message):
     """Обработчик /start"""
     user_id = message.from_user.id
-    user_cart[user_id] = []  # Инициализируем корзину
     
     keyboard = create_main_keyboard()
     
@@ -86,25 +127,28 @@ async def start(message: types.Message):
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
+    logger.info(f"Пользователь {user_id} запустил бота")
 
 @dp.callback_query(lambda c: c.data.startswith("cat_"))
 async def show_category(call: types.CallbackQuery):
     """Показать категорию"""
     cat_id = call.data[4:]  # cat_burgers -> burgers
     
-    if cat_id not in TEST_MENU:
-        await call.answer("Категория не найдена")
+    items = get_items_by_category(cat_id)
+    
+    if not items:
+        await call.answer("В этой категории пока нет товаров")
         return
     
-    items = TEST_MENU[cat_id]
     cat_name = CUISINES.get(cat_id, "Категория")
     
     # Создаем кнопки товаров
     buttons = []
     for item in items:
+        emoji = item.get('image', '🍽️')
         buttons.append([
             InlineKeyboardButton(
-                text=f"{item['name']} - {item['price']}₽",
+                text=f"{emoji} {item['name']} - {item['price']}₽",
                 callback_data=f"item_{item['id']}"
             )
         ])
@@ -127,24 +171,27 @@ async def show_item(call: types.CallbackQuery):
     """Показать товар"""
     item_id = call.data[5:]  # item_whopper -> whopper
     
-    # Ищем товар во всех категориях
-    item = None
-    for cat_items in TEST_MENU.values():
-        for it in cat_items:
-            if it["id"] == item_id:
-                item = it
-                break
-        if item:
-            break
+    item = find_item(item_id)
     
     if not item:
         await call.answer("Товар не найден")
         return
     
-    text = f"*{item['name']}*\n\n{item['description']}\n\n💰 *Цена: {item['price']}₽*"
+    # Формируем описание
+    description = f"*{item['name']}*\n\n{item.get('description', '')}\n"
+    
+    # Добавляем детали
+    if 'weight' in item:
+        description += f"⚖️ Вес: {item['weight']}\n"
+    if 'size' in item:
+        description += f"📏 Размер: {item['size']}\n"
+    if 'pieces' in item:
+        description += f"🔢 Количество: {item['pieces']}\n"
+    
+    description += f"\n💰 *Цена: {item['price']}₽*"
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"➕ Добавить ({item['price']}₽)", callback_data=f"add_{item_id}")],
+        [InlineKeyboardButton(text=f"➕ Добавить в корзину ({item['price']}₽)", callback_data=f"add_{item_id}")],
         [
             InlineKeyboardButton(text="◀️ Назад", callback_data=f"cat_{item['category']}"),
             InlineKeyboardButton(text="🛒 Корзина", callback_data="cart")
@@ -152,7 +199,7 @@ async def show_item(call: types.CallbackQuery):
     ])
     
     await call.message.edit_text(
-        text,
+        description,
         reply_markup=keyboard,
         parse_mode="Markdown"
     )
@@ -164,23 +211,11 @@ async def add_to_cart(call: types.CallbackQuery):
     item_id = call.data[4:]
     user_id = call.from_user.id
     
-    # Ищем товар
-    item = None
-    for cat_items in TEST_MENU.values():
-        for it in cat_items:
-            if it["id"] == item_id:
-                item = it
-                break
-        if item:
-            break
+    item = find_item(item_id)
     
     if not item:
         await call.answer("Товар не найден")
         return
-    
-    # Инициализируем корзину если нужно
-    if user_id not in user_cart:
-        user_cart[user_id] = []
     
     # Добавляем в корзину
     user_cart[user_id].append(item)
@@ -195,12 +230,12 @@ async def add_to_cart(call: types.CallbackQuery):
 async def show_cart(call: types.CallbackQuery):
     """Показать корзину"""
     user_id = call.from_user.id
+    items = user_cart[user_id]
     
-    if user_id not in user_cart or not user_cart[user_id]:
+    if not items:
         text = "*🛒 Корзина пуста*\n\nДобавьте товары из меню!"
         keyboard = [[InlineKeyboardButton(text="📋 К меню", callback_data="back")]]
     else:
-        items = user_cart[user_id]
         total = sum(item["price"] for item in items)
         
         # Считаем количество каждого товара
@@ -243,12 +278,12 @@ async def clear_cart(call: types.CallbackQuery):
 async def checkout(call: types.CallbackQuery):
     """Оформить заказ"""
     user_id = call.from_user.id
+    items = user_cart.get(user_id, [])
     
-    if user_id not in user_cart or not user_cart[user_id]:
+    if not items:
         await call.answer("Корзина пуста!", show_alert=True)
         return
     
-    items = user_cart[user_id]
     total = sum(item["price"] for item in items)
     count = len(items)
     
@@ -257,9 +292,13 @@ async def checkout(call: types.CallbackQuery):
     
     await call.message.edit_text(
         f"✅ *Заказ принят!*\n\n"
-        f"Позиций: {count}\n"
-        f"Сумма: {total}₽\n\n"
-        f"Спасибо за заказ! 🎉",
+        f"📦 Позиций: {count}\n"
+        f"💰 Сумма: {total}₽\n\n"
+        f"Спасибо за заказ! 🎉\n"
+        f"Ожидайте звонка оператора.",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📋 Новый заказ", callback_data="back")]
+        ]),
         parse_mode="Markdown"
     )
     await call.answer()
@@ -281,7 +320,7 @@ async def handle_text(message: types.Message):
     """Обработчик текстовых сообщений"""
     text = message.text.strip().lower()
     
-    if text in ["меню", "menu", "start"]:
+    if text in ["меню", "menu", "start", "/start"]:
         keyboard = create_main_keyboard()
         await message.answer(
             "*MYC RESTAURANT*\n\nВыберите кухню:",
@@ -292,12 +331,12 @@ async def handle_text(message: types.Message):
     
     if text in ["корзина", "cart"]:
         user_id = message.from_user.id
+        items = user_cart[user_id]
         
-        if user_id not in user_cart or not user_cart[user_id]:
+        if not items:
             await message.answer("*🛒 Корзина пуста!*", parse_mode="Markdown")
             return
         
-        items = user_cart[user_id]
         total = sum(item["price"] for item in items)
         
         counts = {}
@@ -321,11 +360,34 @@ async def handle_text(message: types.Message):
         await message.answer(text_response, reply_markup=keyboard, parse_mode="Markdown")
         return
     
-    await message.answer("Используйте кнопки меню или напишите 'меню'")
+    # Поиск товаров
+    if len(text) > 2:
+        results = search_items_in_menu(text)
+        if results:
+            response = "🔍 *Найденные товары:*\n\n"
+            for item in results[:5]:
+                response += f"• {item['name']} - {item['price']}₽\n"
+            response += "\nИспользуйте кнопки меню для заказа."
+            await message.answer(response, parse_mode="Markdown")
+            return
+    
+    # Стандартный ответ
+    await message.answer(
+        "🤖 Используйте кнопки меню или напишите:\n\n"
+        "• **Меню** - показать кухни\n"
+        "• **Корзина** - посмотреть корзину\n"
+        "• **Название блюда** - поиск товара",
+        parse_mode="Markdown"
+    )
 
 async def main():
     """Главная функция"""
-    logger.info("🚀 Запуск MYC RESTAURANT бота...")
+    logger.info("=" * 50)
+    logger.info("🚀 ЗАПУСК MYC RESTAURANT БОТА")
+    logger.info(f"Используется меню: {'РЕАЛЬНОЕ' if USE_REAL_MENU else 'ТЕСТОВОЕ'}")
+    logger.info(f"Доступные кухни: {list(CUISINES.keys())}")
+    logger.info("=" * 50)
+    
     try:
         await dp.start_polling(bot)
     except Exception as e:
