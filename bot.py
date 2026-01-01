@@ -1,4 +1,4 @@
-# bot.py — ФИНАЛЬНАЯ РАБОЧАЯ ВЕРСИЯ
+# bot.py — ФИНАЛЬНАЯ ВЕРСИЯ ТОЛЬКО С РЕАЛЬНЫМ МЕНЮ
 import asyncio
 import os
 import sys
@@ -21,14 +21,18 @@ except ImportError as e:
     print(f"❌ Ошибка загрузки config.py: {e}")
     sys.exit(1)
 
-# Пробуем импортировать меню
+# Импортируем реальное меню
 try:
     from menu import get_menu_by_category, find_item_by_id, search_items
-    print(f"✅ Меню загружено")
-    USE_REAL_MENU = True
-except ImportError:
-    print("⚠️  Меню не загружено, используется тестовое меню")
-    USE_REAL_MENU = False
+    print(f"✅ Реальное меню загружено")
+except ImportError as e:
+    print(f"❌ Ошибка загрузки реального меню: {e}")
+    print("   Убедитесь, что папка menu/ содержит:")
+    print("   - __init__.py")
+    print("   - burger_menu.py") 
+    print("   - italy_menu.py")
+    print("   - sushi_menu.py")
+    sys.exit(1)
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -40,54 +44,6 @@ dp = Dispatcher()
 
 # Корзина пользователей
 user_cart = defaultdict(list)
-
-# Тестовое меню (на случай если real menu не загрузится)
-TEST_MENU = {
-    "burgers": [
-        {"id": "whopper", "name": "Воппер", "price": 299, "description": "Классический бургер", "category": "burgers"},
-        {"id": "cheeseburger", "name": "Чизбургер", "price": 199, "description": "С сыром", "category": "burgers"},
-    ],
-    "italy": [
-        {"id": "margarita", "name": "Маргарита", "price": 499, "description": "Пицца", "category": "italy"},
-        {"id": "pasta", "name": "Паста", "price": 399, "description": "Спагетти", "category": "italy"},
-    ],
-    "sushi": [
-        {"id": "philadelphia", "name": "Филадельфия", "price": 399, "description": "Ролл", "category": "sushi"},
-        {"id": "california", "name": "Калифорния", "price": 359, "description": "Ролл с крабом", "category": "sushi"},
-    ]
-}
-
-def get_items_by_category(category_id):
-    """Получить товары категории"""
-    if USE_REAL_MENU:
-        return get_menu_by_category(category_id)
-    else:
-        return TEST_MENU.get(category_id, [])
-
-def find_item(item_id):
-    """Найти товар по ID"""
-    if USE_REAL_MENU:
-        return find_item_by_id(item_id)
-    else:
-        # Ищем в тестовом меню
-        for cat_items in TEST_MENU.values():
-            for item in cat_items:
-                if item["id"] == item_id:
-                    return item
-        return None
-
-def search_items_in_menu(query):
-    """Поиск товаров"""
-    if USE_REAL_MENU:
-        return search_items(query)
-    else:
-        results = []
-        query_lower = query.lower()
-        for cat_items in TEST_MENU.values():
-            for item in cat_items:
-                if query_lower in item["name"].lower():
-                    results.append(item)
-        return results
 
 def create_main_keyboard():
     """Создает главную клавиатуру"""
@@ -134,7 +90,7 @@ async def show_category(call: types.CallbackQuery):
     """Показать категорию"""
     cat_id = call.data[4:]  # cat_burgers -> burgers
     
-    items = get_items_by_category(cat_id)
+    items = get_menu_by_category(cat_id)
     
     if not items:
         await call.answer("В этой категории пока нет товаров")
@@ -171,7 +127,7 @@ async def show_item(call: types.CallbackQuery):
     """Показать товар"""
     item_id = call.data[5:]  # item_whopper -> whopper
     
-    item = find_item(item_id)
+    item = find_item_by_id(item_id)
     
     if not item:
         await call.answer("Товар не найден")
@@ -211,7 +167,7 @@ async def add_to_cart(call: types.CallbackQuery):
     item_id = call.data[4:]
     user_id = call.from_user.id
     
-    item = find_item(item_id)
+    item = find_item_by_id(item_id)
     
     if not item:
         await call.answer("Товар не найден")
@@ -362,7 +318,7 @@ async def handle_text(message: types.Message):
     
     # Поиск товаров
     if len(text) > 2:
-        results = search_items_in_menu(text)
+        results = search_items(text)
         if results:
             response = "🔍 *Найденные товары:*\n\n"
             for item in results[:5]:
@@ -384,7 +340,7 @@ async def main():
     """Главная функция"""
     logger.info("=" * 50)
     logger.info("🚀 ЗАПУСК MYC RESTAURANT БОТА")
-    logger.info(f"Используется меню: {'РЕАЛЬНОЕ' if USE_REAL_MENU else 'ТЕСТОВОЕ'}")
+    logger.info(f"Используется РЕАЛЬНОЕ меню из папки menu/")
     logger.info(f"Доступные кухни: {list(CUISINES.keys())}")
     logger.info("=" * 50)
     
