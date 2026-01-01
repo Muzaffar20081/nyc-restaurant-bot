@@ -42,20 +42,7 @@ dp = Dispatcher()
 user_cart = defaultdict(list)
 
 # Тестовое меню (на случай если real menu не загрузится)
-TEST_MENU = {
-    "burgers": [
-        {"id": "whopper", "name": "Воппер", "price": 299, "description": "Классический бургер", "category": "burgers"},
-        {"id": "cheeseburger", "name": "Чизбургер", "price": 199, "description": "С сыром", "category": "burgers"},
-    ],
-    "italy": [
-        {"id": "margarita", "name": "Маргарита", "price": 499, "description": "Пицца", "category": "italy"},
-        {"id": "pasta", "name": "Паста", "price": 399, "description": "Спагетти", "category": "italy"},
-    ],
-    "sushi": [
-        {"id": "philadelphia", "name": "Филадельфия", "price": 399, "description": "Ролл", "category": "sushi"},
-        {"id": "california", "name": "Калифорния", "price": 359, "description": "Ролл с крабом", "category": "sushi"},
-    ]
-}
+
 
 def get_items_by_category(category_id):
     """Получить товары категории"""
@@ -397,3 +384,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
