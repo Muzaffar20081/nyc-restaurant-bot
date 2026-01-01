@@ -3,43 +3,27 @@ from .burger_menu import BURGER_MENU
 from .italy_menu import ITALY_MENU
 from .sushi_menu import SUSHI_MENU
 
-# Объединяем все меню
 ALL_MENUS = {
     "burgers": BURGER_MENU,
-    "pizza": ITALY_MENU,
+    "italy": ITALY_MENU,
     "sushi": SUSHI_MENU,
 }
 
-# Категории для отображения
-MENU_CATEGORIES = [
-    {"id": "burgers", "name": "🍔 Бургеры", "emoji": "🍔"},
-    {"id": "pizza", "name": "🍕 Пицца", "emoji": "🍕"},
-    {"id": "sushi", "name": "🍣 Суши", "emoji": "🍣"},
-]
-
-def get_menu_by_category(category_id: str) -> list:
-    """Получить меню по категории"""
+def get_menu_by_category(category_id):
     return ALL_MENUS.get(category_id, [])
 
-def find_item_by_id(item_id: str) -> dict:
-    """Найти товар по ID во всех меню"""
-    for category_items in ALL_MENUS.values():
-        for item in category_items:
+def find_item_by_id(item_id):
+    for items in ALL_MENUS.values():
+        for item in items:
             if item.get("id") == item_id:
                 return item
     return None
 
-def search_items(query: str) -> list:
-    """Поиск товаров по названию"""
+def search_items(query):
     results = []
-    query_lower = query.lower().strip()
-    
-    if len(query_lower) < 2:
-        return results
-    
-    for category_items in ALL_MENUS.values():
-        for item in category_items:
-            if query_lower in item["name"].lower():
+    query = query.lower()
+    for items in ALL_MENUS.values():
+        for item in items:
+            if query in item["name"].lower():
                 results.append(item)
-    
     return results
