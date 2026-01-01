@@ -326,11 +326,11 @@ async def text_handler(message: types.Message):
                 counts[name] = {'price': item['price'], 'count': 1, 'total': item['price']}
             total += item['price']
         
-        text = "*🛒 Ваша корзина:*\n\n"
+        text_response = "*🛒 Ваша корзина:*\n\n"
         for name, data in counts.items():
-            text += f"• {name} ×{data['count']} = {data['total']}₽\n"
+            text_response += f"• {name} ×{data['count']} = {data['total']}₽\n"
         
-        text += f"\n💰 *Итого: {total}₽*"
+        text_response += f"\n💰 *Итого: {total}₽*"
         
         keyboard = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🗑️ Очистить", callback_data="clear_cart")],
@@ -338,7 +338,7 @@ async def text_handler(message: types.Message):
             [InlineKeyboardButton(text="📋 К меню", callback_data="main_menu")]
         ])
         
-        await message.answer(text, reply_markup=keyboard)
+        await message.answer(text_response, reply_markup=keyboard)
         return
     
     # Поиск
