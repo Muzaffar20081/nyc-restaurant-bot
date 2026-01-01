@@ -17,11 +17,11 @@ MENU_CATEGORIES = [
     {"id": "sushi", "name": "🍣 Суши", "emoji": "🍣"},
 ]
 
-def get_menu_by_category(category_id):
+def get_menu_by_category(category_id: str) -> list:
     """Получить меню по категории"""
     return ALL_MENUS.get(category_id, [])
 
-def find_item_by_id(item_id):
+def find_item_by_id(item_id: str) -> dict:
     """Найти товар по ID во всех меню"""
     for category_items in ALL_MENUS.values():
         for item in category_items:
@@ -29,10 +29,13 @@ def find_item_by_id(item_id):
                 return item
     return None
 
-def search_items(query):
+def search_items(query: str) -> list:
     """Поиск товаров по названию"""
     results = []
-    query_lower = query.lower()
+    query_lower = query.lower().strip()
+    
+    if len(query_lower) < 2:
+        return results
     
     for category_items in ALL_MENUS.values():
         for item in category_items:
