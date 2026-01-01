@@ -22,6 +22,20 @@ except ImportError as e:
     print("Проверьте структуру папки menu/")
     sys.exit(1)
 
+# Импортируем конфиг
+try:
+    from config import BOT_TOKEN, CUISINES
+    print("✅ Конфиг успешно импортирован")
+    
+    # Обновляем категории из config.py если они там есть
+    if CUISINES:
+        print(f"✅ Найдены кухни в config.py: {CUISINES}")
+        # Можно обновить MENU_CATEGORIES или использовать CUISINES
+except ImportError as e:
+    print(f"❌ Ошибка импорта config.py: {e}")
+    print("Создайте файл config.py с BOT_TOKEN и CUISINES")
+    sys.exit(1)
+
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
@@ -29,10 +43,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Получаем токен
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# Проверяем токен
 if not BOT_TOKEN:
-    logger.error("❌ Токен не найден! Создайте .env файл с BOT_TOKEN=ваш_токен")
+    logger.error("❌ Токен не найден в config.py!")
     sys.exit(1)
 
 # Инициализация
@@ -47,20 +60,23 @@ def create_main_menu():
     """Создает главное меню"""
     keyboard = []
     
-    # Добавляем категории
-    for i in range(0, len(MENU_CATEGORIES), 2):
+    # Используем CUISINES из config.py для создания меню
+    cuisines_list = list(CUISINES.items())
+    
+    # Добавляем категории по 2 в ряд
+    for i in range(0, len(cuisines_list), 2):
         row = []
-        if i < len(MENU_CATEGORIES):
-            cat1 = MENU_CATEGORIES[i]
+        if i < len(cuisines_list):
+            cat_id, cat_name = cuisines_list[i]
             row.append(InlineKeyboardButton(
-                text=cat1["name"],
-                callback_data=f"cat_{cat1['id']}"
+                text=cat_name,
+                callback_data=f"cat_{cat_id}"
             ))
-        if i + 1 < len(MENU_CATEGORIES):
-            cat2 = MENU_CATEGORIES[i + 1]
+        if i + 1 < len(cuisines_list):
+            cat_id, cat_name = cuisines_list[i + 1]
             row.append(InlineKeyboardButton(
-                text=cat2["name"],
-                callback_data=f"cat_{cat2['id']}"
+                text=cat_name,
+                callback_data=f"cat_{cat_id}"
             ))
         if row:
             keyboard.append(row)
@@ -81,8 +97,8 @@ async def start_command(message: types.Message):
     
     await message.answer(
         f"👋 Привет, {message.from_user.first_name}!\n\n"
-        f"*FOOD EXPRESS*\n\n"
-        f"Выберите категорию:",
+        f"*MYC RESTAURANT*\n\n"
+        f"Выберите кухню:",
         reply_markup=menu
     )
 
@@ -98,12 +114,8 @@ async def category_handler(call: types.CallbackQuery):
         await call.answer("В этой категории пока нет товаров")
         return
     
-    # Находим название категории
-    category_name = "Категория"
-    for cat in MENU_CATEGORIES:
-        if cat["id"] == category_id:
-            category_name = cat["name"]
-            break
+    # Находим название категории из CUISINES
+    category_name = CUISINES.get(category_id, "Категория")
     
     # Создаем кнопки товаров
     keyboard = []
@@ -283,7 +295,7 @@ async def main_menu_handler(call: types.CallbackQuery):
     menu = create_main_menu()
     
     await call.message.edit_text(
-        "*FOOD EXPRESS*\n\nВыберите категорию:",
+        "*MYC RESTAURANT*\n\nВыберите кухню:",
         reply_markup=menu
     )
     await call.answer()
@@ -294,18 +306,18 @@ async def text_handler(message: types.Message):
     if not message.text:
         return
     
-    text = message.text.strip().lower()
+    user_text = message.text.strip().lower()
     
     # Команды
-    if text in ["меню", "menu", "start"]:
+    if user_text in ["меню", "menu", "start", "/start"]:
         menu = create_main_menu()
         await message.answer(
-            "*FOOD EXPRESS*\n\nВыберите категорию:",
+            "*MYC RESTAURANT*\n\nВыберите кухню:",
             reply_markup=menu
         )
         return
     
-    if text in ["корзина", "cart"]:
+    if user_text in ["корзина", "cart"]:
         user_id = message.from_user.id
         items = user_cart[user_id]
         
@@ -342,8 +354,8 @@ async def text_handler(message: types.Message):
         return
     
     # Поиск
-    if len(text) > 2:
-        results = search_items(text)
+    if len(user_text) > 2:
+        results = search_items(user_text)
         if results:
             response = "🔍 *Найденные товары:*\n\n"
             for item in results[:5]:
@@ -355,7 +367,7 @@ async def text_handler(message: types.Message):
     # Стандартный ответ
     await message.answer(
         "🤖 Используйте кнопки меню или напишите:\n\n"
-        "• **Меню** - показать категории\n"
+        "• **Меню** - показать кухни\n"
         "• **Корзина** - посмотреть корзину\n"
         "• **Название блюда** - поиск товара"
     )
@@ -363,8 +375,10 @@ async def text_handler(message: types.Message):
 async def main():
     """Главная функция"""
     logger.info("=" * 50)
-    logger.info("🚀 ЗАПУСК FOOD EXPRESS БОТА")
+    logger.info("🚀 ЗАПУСК MYC RESTAURANT БОТА")
     logger.info("=" * 50)
+    logger.info(f"Используется токен: {BOT_TOKEN[:10]}...")
+    logger.info(f"Доступные кухни: {list(CUISINES.keys())}")
     
     try:
         await dp.start_polling(bot)
