@@ -7,9 +7,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Получаем токен
 try:
-    from config import BOT_TOKEN, CUISINES
+    from config import BOT_TOKEN
     print(f"✅ Токен: {BOT_TOKEN[:10]}...")
-    print(f"✅ Кухни: {CUISINES}")
 except:
     print("❌ Нет config.py")
     sys.exit(1)
@@ -67,11 +66,13 @@ async def handle_button(call: types.CallbackQuery):
     
     elif data == "add_burger":
         await call.answer("✅ Бургер добавлен!")
-        await start_command(call.message)
+        # Используем новую функцию show_main_menu
+        await show_main_menu(call.message)
     
     elif data == "add_pizza":
         await call.answer("✅ Пицца добавлена!")
-        await start_command(call.message)
+        # Используем новую функцию show_main_menu
+        await show_main_menu(call.message)
     
     elif data == "cart":
         await call.answer("🛒 Корзина")
@@ -95,13 +96,16 @@ async def handle_button(call: types.CallbackQuery):
         )
     
     elif data == "back":
-        await start_command(call.message)
+        # Используем новую функцию show_main_menu
+        await show_main_menu(call.message)
         await call.answer("Назад")
 
-async def start_command(message):
-    """Функция для показа стартового меню"""
-    if isinstance(message, types.CallbackQuery):
-        message = message.message
+async def show_main_menu(message_or_call):
+    """Функция для показа главного меню"""
+    if isinstance(message_or_call, types.CallbackQuery):
+        message = message_or_call.message
+    else:
+        message = message_or_call
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="🍔 Бургер", callback_data="burger")],
@@ -110,7 +114,7 @@ async def start_command(message):
     ])
     
     await message.edit_text(
-        f"Выбери еду:",
+        "Выбери еду:",
         reply_markup=keyboard
     )
 
