@@ -1,4 +1,4 @@
-# myc_restaurant_bot.py — ФИНАЛЬНЫЙ РАБОЧИЙ БОТ
+# myc_restaurant_bot.py — ФИНАЛЬНЫЙ РАБОЧИЙ БОТ (ИСПРАВЛЕННЫЙ)
 import asyncio
 import os
 import sys
@@ -142,7 +142,16 @@ async def category_callback(call: types.CallbackQuery):
     # Создаем кнопки товаров
     keyboard = []
     for item in items:
-        emoji = "🍔" if cat_id == "burgers" else "🍕" if cat_id == "italy" else "🍣" if cat_id == "sushi" else "🍽️"
+        # Определяем эмодзи для категории
+        if cat_id == "burgers":
+            emoji = "🍔"
+        elif cat_id == "italy":
+            emoji = "🍕"
+        elif cat_id == "sushi":
+            emoji = "🍣"
+        else:
+            emoji = "🍽️"
+            
         keyboard.append([
             InlineKeyboardButton(
                 text=f"{emoji} {item['name']} - {item['price']}₽",
