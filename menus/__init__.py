@@ -1,29 +1,20 @@
-# menu/__init__.py
-from .burger_menu import BURGER_MENU
-from .italy_menu import ITALY_MENU
-from .sushi_menu import SUSHI_MENU
+"""
+Инициализация модуля меню
+"""
+from .burger_menu import BurgerMenu
+from .italy_menu import ItalyMenu
+from .sushi_menu import SushiMenu
 
-ALL_MENUS = {
-    "burgers": BURGER_MENU,
-    "italy": ITALY_MENU,
-    "sushi": SUSHI_MENU,
+__all__ = ['BurgerMenu', 'ItalyMenu', 'SushiMenu']
+
+# Создаем глобальные экземпляры меню для использования во всем приложении
+burger_menu = BurgerMenu()
+italy_menu = ItalyMenu()
+sushi_menu = SushiMenu()
+
+# Словарь всех меню для быстрого доступа
+MENUS = {
+    'burger': burger_menu,
+    'italy': italy_menu,
+    'sushi': sushi_menu
 }
-
-def get_menu_by_category(category_id):
-    return ALL_MENUS.get(category_id, [])
-
-def find_item_by_id(item_id):
-    for items in ALL_MENUS.values():
-        for item in items:
-            if item.get("id") == item_id:
-                return item
-    return None
-
-def search_items(query):
-    results = []
-    query = query.lower()
-    for items in ALL_MENUS.values():
-        for item in items:
-            if query in item["name"].lower():
-                results.append(item)
-    return results
