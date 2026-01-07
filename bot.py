@@ -1,17 +1,20 @@
-# bot.py - Объединенный красивый бот
+# bot.py - Объединенный красивый бот (Исправленная версия)
 import asyncio
 from datetime import datetime
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # Импортируем наши меню
 from menus import MENUS, burger_menu, italy_menu, sushi_menu
 
-# Инициализация бота
-bot = Bot(token="ВАШ_ТОКЕН")
+# Инициализация бота (ЗАМЕНИТЕ НА СВОЙ ТОКЕН)
+bot = Bot(token="ВАШ_ТОКЕН_ЗДЕСЬ")
 dp = Dispatcher()
+
+# Временное хранилище для корзины (в реальном проекте используйте БД)
+user_carts = {}
 
 # ========== КРАСИВОЕ ГЛАВНОЕ МЕНЮ ==========
 @dp.message(CommandStart())
@@ -23,9 +26,9 @@ async def start(message: types.Message):
     
     # Основные кнопки кухонь
     buttons = [
-        (burger_menu.icon + " " + burger_menu.name, f"show_menu:burger"),
-        (italy_menu.icon + " " + italy_menu.name, f"show_menu:italy"),
-        (sushi_menu.icon + " " + sushi_menu.name, f"show_menu:sushi"),
+        (f"{burger_menu.icon} {burger_menu.name}", f"show_menu:burger"),
+        (f"{italy_menu.icon} {italy_menu.name}", f"show_menu:italy"),
+        (f"{sushi_menu.icon} {sushi_menu.name}", f"show_menu:sushi"),
         ("🎯 Рекомендации", "recommendations"),
         ("⭐ Избранное", "favorites"),
         ("📊 Топ продаж", "top_sales")
@@ -62,10 +65,10 @@ async def start(message: types.Message):
 ⏰ Доставка за <b>30 минут</b> или бесплатно!
 
 👇 <b>Выберите кухню или воспользуйтесь навигацией:</b>
-    """
+"""
     
     await message.answer_photo(
-        photo="https://via.placeholder.com/1200x400?text=Food+Delivery",
+        photo="https://via.placeholder.com/1200x400/FF6B6B/FFFFFF?text=Food+Delivery",
         caption=welcome_text,
         parse_mode="HTML",
         reply_markup=builder.as_markup()
@@ -88,6 +91,9 @@ async def show_menu_handler(call: types.CallbackQuery):
         await loading_msg.delete()
         
         # Форматируем текст меню
+        min_price = min(item['price'] for item in menu.items) if menu.items else 0
+        avg_time = sum(item['cooking_time'] for item in menu.items) // len(menu.items) if menu.items else 0
+        
         menu_text = f"""
 {menu.icon * 3} <b>{menu.name.upper()}</b> {menu.icon * 3}
 
@@ -100,10 +106,10 @@ async def show_menu_handler(call: types.CallbackQuery):
 ⭐ Выбор наших шеф-поваров
 🚀 Быстрее всего готовятся
 
-💰 <b>ЦЕНЫ ОТ:</b> {min(item['price'] for item in menu.items)}₽
-⏱️ <b>СРЕДНЕЕ ВРЕМЯ:</b> {sum(item['cooking_time'] for item in menu.items) // len(menu.items)} мин
+💰 <b>ЦЕНЫ ОТ:</b> {min_price}₽
+⏱️ <b>СРЕДНЕЕ ВРЕМЯ:</b> {avg_time} мин
 ⭐ <b>РЕЙТИНГ:</b> {'★' * 4}☆ (4.8/5)
-        """
+"""
         
         # Создаем интерактивную клавиатуру
         builder = InlineKeyboardBuilder()
@@ -190,8 +196,7 @@ async def show_item_handler(call: types.CallbackQuery):
 
 ━━━━━━━━━━━━━━━━━━━━
 💰 <b>ЦЕНА:</b> <code>{item['price']}₽</code>
-        
-        """
+"""
         
         # Добавляем детали
         details = []
@@ -207,17 +212,22 @@ async def show_item_handler(call: types.CallbackQuery):
         
         details.append(f"⏱️ <b>Приготовление:</b> {item['cooking_time']} мин")
         
-        text += "\n".join(details) + "\n"
+        if details:
+            text += "\n".join(details) + "\n"
         
         # Пищевая ценность
         if 'calories' in item:
+            proteins = (item['calories'] * 0.3) / 4
+            fats = (item['calories'] * 0.4) / 9
+            carbs = (item['calories'] * 0.3) / 4
+            
             text += f"""
 ━━━━━━━━━━━━━━━━━━━━
 🍎 <b>ПИЩЕВАЯ ЦЕННОСТЬ:</b>
-• Белки: {(item['calories'] * 0.3) / 4:.1f}г
-• Жиры: {(item['calories'] * 0.4) / 9:.1f}г  
-• Углеводы: {(item['calories'] * 0.3) / 4:.1f}г
-            """
+• Белки: {proteins:.1f}г
+• Жиры: {fats:.1f}г  
+• Углеводы: {carbs:.1f}г
+"""
         
         # Клавиатура для блюда
         builder = InlineKeyboardBuilder()
@@ -226,27 +236,27 @@ async def show_item_handler(call: types.CallbackQuery):
         builder.row(
             InlineKeyboardButton(
                 text="🛒 Добавить в корзину",
-                callback_data=f"add_to_cart:{menu_type}:{item_id}"
+                callback_data=f"add_to_cart:{menu_type}:{item['id']}:1"
             ),
             width=1
         )
         
         # Управление количеством
         builder.row(
-            InlineKeyboardButton(text="➖", callback_data=f"decrease:{menu_type}:{item_id}"),
-            InlineKeyboardButton(text="1 шт", callback_data=f"quantity:{menu_type}:{item_id}:1"),
-            InlineKeyboardButton(text="➕", callback_data=f"increase:{menu_type}:{item_id}")
+            InlineKeyboardButton(text="➖", callback_data=f"decrease:{menu_type}:{item['id']}"),
+            InlineKeyboardButton(text="1 шт", callback_data=f"quantity:{menu_type}:{item['id']}:1"),
+            InlineKeyboardButton(text="➕", callback_data=f"increase:{menu_type}:{item['id']}")
         )
         
         # Дополнительные функции
         builder.row(
-            InlineKeyboardButton(text="⭐ В избранное", callback_data=f"add_favorite:{menu_type}:{item_id}"),
-            InlineKeyboardButton(text="💬 Отзывы", callback_data=f"reviews:{menu_type}:{item_id}")
+            InlineKeyboardButton(text="⭐ В избранное", callback_data=f"add_favorite:{menu_type}:{item['id']}"),
+            InlineKeyboardButton(text="💬 Отзывы", callback_data=f"reviews:{menu_type}:{item['id']}")
         )
         
         builder.row(
-            InlineKeyboardButton(text="📋 Состав", callback_data=f"ingredients:{menu_type}:{item_id}"),
-            InlineKeyboardButton(text="📸 Фото", callback_data=f"photos:{menu_type}:{item_id}")
+            InlineKeyboardButton(text="📋 Состав", callback_data=f"ingredients:{menu_type}:{item['id']}"),
+            InlineKeyboardButton(text="📸 Фото", callback_data=f"photos:{menu_type}:{item['id']}")
         )
         
         # Навигация
@@ -259,12 +269,12 @@ async def show_item_handler(call: types.CallbackQuery):
         try:
             await call.message.delete()
             await call.message.answer_photo(
-                photo=f"https://via.placeholder.com/800x600?text={item['name'].replace(' ', '+')}",
+                photo=f"https://via.placeholder.com/800x600/4ECDC4/FFFFFF?text={item['name'].replace(' ', '+')}",
                 caption=text,
                 parse_mode="HTML",
                 reply_markup=builder.as_markup()
             )
-        except:
+        except Exception as e:
             await call.message.edit_text(
                 text,
                 parse_mode="HTML",
@@ -275,12 +285,13 @@ async def show_item_handler(call: types.CallbackQuery):
         
     except Exception as e:
         await call.answer("❌ Ошибка при загрузке блюда", show_alert=True)
+        print(f"Error in show_item_handler: {e}")
 
 # ========== КРАСИВОЕ ДОБАВЛЕНИЕ В КОРЗИНУ ==========
 @dp.callback_query(lambda call: call.data.startswith("add_to_cart:"))
 async def add_to_cart_handler(call: types.CallbackQuery):
     try:
-        _, menu_type, item_id = call.data.split(":")
+        _, menu_type, item_id, quantity = call.data.split(":")
         menu = MENUS.get(menu_type)
         item = menu.get_item_details(item_id) if menu else None
         
@@ -288,50 +299,81 @@ async def add_to_cart_handler(call: types.CallbackQuery):
             await call.answer("❌ Блюдо не найдено", show_alert=True)
             return
         
+        user_id = call.from_user.id
+        
+        # Инициализируем корзину пользователя если нет
+        if user_id not in user_carts:
+            user_carts[user_id] = []
+        
+        # Проверяем, есть ли уже этот товар в корзине
+        cart_item = None
+        for cart_item_data in user_carts[user_id]:
+            if cart_item_data['item_id'] == item_id and cart_item_data['menu_type'] == menu_type:
+                cart_item = cart_item_data
+                break
+        
+        if cart_item:
+            # Увеличиваем количество
+            cart_item['quantity'] += int(quantity)
+            cart_item['total'] = cart_item['quantity'] * cart_item['price']
+        else:
+            # Добавляем новый товар
+            user_carts[user_id].append({
+                'item_id': item_id,
+                'menu_type': menu_type,
+                'name': item['name'],
+                'price': item['price'],
+                'quantity': int(quantity),
+                'total': item['price'] * int(quantity)
+            })
+        
         # Анимация добавления
-        original_text = call.message.text or call.message.caption
-        await call.message.edit_caption(
-            caption="🔄 <b>Добавляем в корзину...</b>",
-            parse_mode="HTML"
-        ) if call.message.caption else await call.message.edit_text(
-            "🔄 <b>Добавляем в корзину...</b>",
-            parse_mode="HTML"
-        )
-        
-        await asyncio.sleep(0.7)
-        
-        # Здесь должна быть логика добавления в БД
-        # cart.add_item(call.from_user.id, item_id, menu_type, item['price'])
-        
-        # Обновляем сообщение с подтверждением
-        new_text = original_text + "\n\n" + f"""
-━━━━━━━━━━━━━━━━━━━━
-✅ <b>УСПЕШНО ДОБАВЛЕНО!</b>
-
-🎉 <b>{item['name']}</b> теперь в вашей корзине!
-💰 Стоимость: <b>{item['price']}₽</b>
-📦 <i>Продолжайте выбирать или перейдите в корзину</i>
-        """
-        
-        if call.message.caption:
+        if hasattr(call.message, 'caption') and call.message.caption:
             await call.message.edit_caption(
-                caption=new_text,
+                caption="🔄 <b>Добавляем в корзину...</b>",
                 parse_mode="HTML"
             )
         else:
             await call.message.edit_text(
-                new_text,
+                "🔄 <b>Добавляем в корзину...</b>",
+                parse_mode="HTML"
+            )
+        
+        await asyncio.sleep(0.7)
+        
+        # Обновляем сообщение с подтверждением
+        success_text = f"""
+✅ <b>УСПЕШНО ДОБАВЛЕНО!</b>
+
+🎉 <b>{item['name']}</b> теперь в вашей корзине!
+💰 Стоимость: <b>{item['price']}₽ × {quantity} = {item['price'] * int(quantity)}₽</b>
+📦 Всего товаров в корзине: {sum(item['quantity'] for item in user_carts[user_id])}
+
+<i>Продолжайте выбирать или перейдите в корзину</i>
+"""
+        
+        if hasattr(call.message, 'caption') and call.message.caption:
+            original_text = call.message.caption.split("\n━━━━━━━━━━━━━━━━━━━━\n✅")[0]
+            await call.message.edit_caption(
+                caption=original_text + "\n━━━━━━━━━━━━━━━━━━━━\n" + success_text,
+                parse_mode="HTML"
+            )
+        else:
+            original_text = call.message.text.split("\n━━━━━━━━━━━━━━━━━━━━\n✅")[0]
+            await call.message.edit_text(
+                original_text + "\n━━━━━━━━━━━━━━━━━━━━\n" + success_text,
                 parse_mode="HTML"
             )
         
         # Красивое уведомление
         await call.answer(
-            f"✅ {item['name']} добавлен!\n💰 Цена: {item['price']}₽",
+            f"✅ {item['name']} добавлен!\n💰 {item['price']}₽ × {quantity}",
             show_alert=True
         )
         
     except Exception as e:
         await call.answer("❌ Ошибка при добавлении", show_alert=True)
+        print(f"Error in add_to_cart_handler: {e}")
 
 # ========== КРАСИВЫЙ ВОЗВРАТ НА ГЛАВНУЮ ==========
 @dp.callback_query(lambda call: call.data == "back_to_main")
@@ -368,8 +410,12 @@ async def back_to_main_handler(call: types.CallbackQuery):
             InlineKeyboardButton(text="👑 Премиум", callback_data="premium")
         )
         
+        # Получаем количество товаров в корзине
+        cart_count = sum(item['quantity'] for item in user_carts.get(call.from_user.id, []))
+        cart_info = f" ({cart_count})" if cart_count > 0 else ""
+        
         await call.message.edit_text(
-            """
+            f"""
 🏠 <b>ГЛАВНОЕ МЕНЮ</b>
 ━━━━━━━━━━━━━━━━━━━━
 
@@ -382,8 +428,9 @@ async def back_to_main_handler(call: types.CallbackQuery):
 • Пицца Пепперони - 25 заказов  
 • Бургер Классический - 20 заказов
 
+🛒 <b>Товаров в корзине:</b> {cart_count}
 🎁 <b>Акция дня:</b> Скидка 15% на первый заказ!
-            """,
+""",
             parse_mode="HTML",
             reply_markup=builder.as_markup()
         )
@@ -392,22 +439,44 @@ async def back_to_main_handler(call: types.CallbackQuery):
         
     except Exception as e:
         await call.answer("❌ Ошибка", show_alert=True)
+        print(f"Error in back_to_main_handler: {e}")
 
 # ========== КРАСИВАЯ КОРЗИНА ==========
 @dp.callback_query(lambda call: call.data == "show_cart")
 async def show_cart_handler(call: types.CallbackQuery):
-    # Здесь должна быть логика получения корзины из БД
-    # cart_items = get_cart_items(call.from_user.id)
+    user_id = call.from_user.id
     
-    # Для примера создаем тестовую корзину
-    cart_items = [
-        {"name": "Классический бургер", "price": 350, "quantity": 2, "total": 700},
-        {"name": "Пицца Маргарита", "price": 550, "quantity": 1, "total": 550},
-        {"name": "Роллы Филадельфия", "price": 450, "quantity": 1, "total": 450},
-    ]
+    # Получаем товары из корзины
+    cart_items = user_carts.get(user_id, [])
     
+    if not cart_items:
+        # Корзина пуста
+        cart_text = """
+🛒 <b>ВАША КОРЗИНА</b>
+━━━━━━━━━━━━━━━━━━━━
+
+😔 <b>Корзина пуста</b>
+
+Добавьте товары из меню, чтобы сделать заказ!
+"""
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🍔 Посмотреть меню", callback_data="back_to_main")],
+            [InlineKeyboardButton(text="🎯 Рекомендации", callback_data="recommendations")]
+        ])
+        
+        await call.message.edit_text(
+            cart_text,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await call.answer("🛒 Корзина пуста")
+        return
+    
+    # Вычисляем общую сумму
     total_sum = sum(item["total"] for item in cart_items)
     
+    # Формируем текст корзины
     cart_text = """
 🛒 <b>ВАША КОРЗИНА</b>
 ━━━━━━━━━━━━━━━━━━━━
@@ -422,13 +491,19 @@ async def show_cart_handler(call: types.CallbackQuery):
    <i>Сумма: {item['total']}₽</i>
 """
     
+    # Рассчитываем скидку
+    discount = total_sum * 0.15 if total_sum > 0 else 0
+    delivery = 0 if total_sum >= 1500 else 200
+    
     cart_text += f"""
 ━━━━━━━━━━━━━━━━━━━━
-💰 <b>ИТОГО: {total_sum}₽</b>
+💰 <b>Товары:</b> {total_sum}₽
+🎁 <b>Скидка 15%:</b> -{discount:.0f}₽
+🚚 <b>Доставка:</b> {delivery if delivery > 0 else "Бесплатно"}
+━━━━━━━━━━━━━━━━━━━━
+💵 <b>ИТОГО К ОПЛАТЕ:</b> <u>{total_sum - discount + delivery:.0f}₽</u>
 
-🚚 <b>Доставка:</b> Бесплатно (от 1500₽)
 ⏱️ <b>Время доставки:</b> 30-45 минут
-🎁 <b>Ваша скидка:</b> 15% на первый заказ
 """
     
     # Клавиатура корзины
@@ -437,7 +512,7 @@ async def show_cart_handler(call: types.CallbackQuery):
     if cart_items:
         builder.row(
             InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout"),
-            InlineKeyboardButton(text="🔄 Очистить корзину", callback_data="clear_cart")
+            InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")
         )
     
     builder.row(
@@ -456,42 +531,118 @@ async def show_cart_handler(call: types.CallbackQuery):
         reply_markup=builder.as_markup()
     )
     
-    await call.answer("🛒 Открыта корзина")
+    await call.answer(f"🛒 Корзина: {len(cart_items)} товаров")
+
+# ========== ОЧИСТКА КОРЗИНЫ ==========
+@dp.callback_query(lambda call: call.data == "clear_cart")
+async def clear_cart_handler(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    
+    if user_id in user_carts and user_carts[user_id]:
+        cart_count = len(user_carts[user_id])
+        user_carts[user_id] = []
+        
+        await call.message.edit_text(
+            f"""
+🗑️ <b>КОРЗИНА ОЧИЩЕНА</b>
+━━━━━━━━━━━━━━━━━━━━
+
+✅ Удалено {cart_count} товаров
+
+Ваша корзина теперь пуста.
+Вы можете добавить новые товары из меню!
+""",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🍽️ Перейти в меню", callback_data="back_to_main")],
+                [InlineKeyboardButton(text="🎁 Посмотреть акции", callback_data="promotions")]
+            ])
+        )
+        await call.answer("🗑️ Корзина очищена")
+    else:
+        await call.answer("🛒 Корзина уже пуста", show_alert=True)
 
 # ========== ОБРАБОТЧИКИ ДЛЯ УПРАВЛЕНИЯ КОЛИЧЕСТВОМ ==========
 @dp.callback_query(lambda call: call.data.startswith("increase:"))
 async def increase_quantity(call: types.CallbackQuery):
     _, menu_type, item_id = call.data.split(":")
-    # Здесь логика увеличения количества
     await call.answer("➕ Количество увеличено")
+    # Здесь можно добавить логику обновления количества в реальном времени
 
 @dp.callback_query(lambda call: call.data.startswith("decrease:"))
 async def decrease_quantity(call: types.CallbackQuery):
     _, menu_type, item_id = call.data.split(":")
-    # Здесь логика уменьшения количества
     await call.answer("➖ Количество уменьшено")
+    # Здесь можно добавить логику обновления количества в реальном времени
+
+# ========== КОМАНДА /HELP ==========
+@dp.message(Command("help"))
+async def help_command(message: types.Message):
+    help_text = """
+🤖 <b>ПОМОЩЬ ПО КОМАНДАМ</b>
+━━━━━━━━━━━━━━━━━━━━
+
+<b>Основные команды:</b>
+/start - Начать работу с ботом
+/help - Показать это сообщение
+/menu - Показать меню
+/cart - Показать корзину
+
+<b>Навигация:</b>
+• Используйте кнопки для выбора категорий
+• Нажимайте на товары для просмотра деталей
+• Добавляйте товары в корзину
+• Оформляйте заказ через корзину
+
+<b>Поддержка:</b>
+Если у вас возникли проблемы, напишите нам:
+📞 support@fooddelivery.com
+"""
+    
+    await message.answer(help_text, parse_mode="HTML")
+
+# ========== КОМАНДА /MENU ==========
+@dp.message(Command("menu"))
+async def menu_command(message: types.Message):
+    # Показываем главное меню
+    await start(message)
+
+# ========== КОМАНДА /CART ==========
+@dp.message(Command("cart"))
+async def cart_command(message: types.Message):
+    # Создаем фейковый call для обработки
+    class FakeCall:
+        def __init__(self, user_id, message):
+            self.from_user = type('obj', (object,), {'id': user_id})()
+            self.message = message
+            self.data = "show_cart"
+    
+    fake_call = FakeCall(message.from_user.id, message)
+    await show_cart_handler(fake_call)
 
 # ========== ОБРАБОТЧИК ОШИБОК ==========
 @dp.callback_query(lambda call: True)
 async def default_handler(call: types.CallbackQuery):
     if call.data in ["recommendations", "favorites", "top_sales", "about", "contacts", 
                      "ai_recommendations", "stats", "show_favorites", "promotions", 
-                     "premium", "checkout", "clear_cart", "edit_cart", "support_cart"]:
+                     "premium", "checkout", "edit_cart", "support_cart", "suggest_idea"]:
         
         # Красивое сообщение о разработке
+        function_name = call.data.replace('_', ' ').title()
+        
         await call.message.edit_text(
             f"""
 🔧 <b>ФУНКЦИЯ В РАЗРАБОТКЕ</b>
 ━━━━━━━━━━━━━━━━━━━━
 
-🎉 <b>{call.data.replace('_', ' ').title()}</b> скоро будет доступна!
+🎉 <b>{function_name}</b> скоро будет доступна!
 
 Наши разработчики усердно трудятся над этой функцией.
 Ожидайте обновления в ближайшее время!
 
 📅 <b>Статус:</b> В разработке
 ⏰ <b>Примерное время:</b> 2-3 недели
-            """,
+""",
             parse_mode="HTML",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[
                 [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main")],
@@ -502,13 +653,37 @@ async def default_handler(call: types.CallbackQuery):
     else:
         await call.answer("❌ Неизвестная команда")
 
+# ========== ОБРАБОТКА ВСЕХ СООБЩЕНИЙ ==========
+@dp.message()
+async def handle_messages(message: types.Message):
+    # Если пользователь отправил текст, а не команду
+    if message.text and not message.text.startswith('/'):
+        await message.answer(
+            """
+🤖 <b>Я вас не понял</b>
+
+Используйте кнопки меню или команды:
+/start - Начать заказ
+/menu - Посмотреть меню
+/cart - Открыть корзину
+/help - Помощь
+""",
+            parse_mode="HTML"
+        )
+
 # ========== ЗАПУСК БОТА ==========
 async def main():
     print("🚀 Бот запускается...")
     print("=" * 50)
     print("🍽️  Food Delivery Bot")
-    print("📱 Версия: 2.0 (Красивая версия)")
-    print("🎨 Дизайн: Premium")
+    print("📱 Версия: 3.0 (Исправленная)")
+    print("🎨 Дизайн: Premium Edition")
+    print("=" * 50)
+    print("Доступные команды:")
+    print("/start - Начать работу")
+    print("/help - Помощь")
+    print("/menu - Меню")
+    print("/cart - Корзина")
     print("=" * 50)
     
     try:
