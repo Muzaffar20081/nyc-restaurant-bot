@@ -1,151 +1,271 @@
+# bot.py - Простой рабочий бот
 import asyncio
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import CommandStart, Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.filters import CommandStart
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# from menus import MENUS, burger_menu, italy_menu, sushi_menu   # ← предполагается, что этот файл существует
+# Импортируем конфиг и меню
+try:
+    from config import BOT_TOKEN, CUISINES
+    from menus import MENUS, burger_menu, italy_menu, sushi_menu
+    print("✅ Конфиг и меню загружены")
+except ImportError as e:
+    print(f"❌ Ошибка импорта: {e}")
+    print("Проверьте наличие файлов:")
+    print("1. config.py с BOT_TOKEN и CUISINES")
+    print("2. menus/__init__.py")
+    print("3. menus/burger_menu.py, italy_menu.py, sushi_menu.py")
+    exit(1)
 
-# Замените на реальный токен!
-bot = Bot(token="ВАШ_ТОКЕН_ЗДЕСЬ")
+# Инициализация бота
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# Временное хранилище корзин (в продакшене → Redis / БД)
+# Временная корзина в памяти
 user_carts = {}
 
-
+# ========== СТАРТОВОЕ МЕНЮ ==========
 @dp.message(CommandStart())
 async def start(message: types.Message):
     user = message.from_user
-
-    builder = InlineKeyboardBuilder()
-
-    # Пример — предполагаем, что у burger_menu, italy_menu, sushi_menu есть .icon, .name, .description
-    buttons = [
-        (f"{burger_menu.icon} {burger_menu.name}", "show_menu:burger"),
-        (f"{italy_menu.icon} {italy_menu.name}",   "show_menu:italy"),
-        (f"{sushi_menu.icon} {sushi_menu.name}",   "show_menu:sushi"),
-        ("🎯 Рекомендации", "recommendations"),
-        ("⭐ Избранное", "favorites"),
-        ("📊 Топ продаж", "top_sales")
-    ]
-
-    for text, cb in buttons:
-        builder.add(InlineKeyboardButton(text=text, callback_data=cb))
-
-    builder.adjust(2, 2, 1, 1)
-
-    builder.row(
-        InlineKeyboardButton(text="ℹ️ О нас", callback_data="about"),
-        InlineKeyboardButton(text="📞 Контакты", callback_data="contacts")
-    )
-
-    welcome_text = f"""
-🌟 <b>Добро пожаловать, {user.first_name}!</b> 🌟
-🍽️ <b>Food Delivery</b> — ваш гастрономический гид!
-
-✨ <b>Что у нас есть:</b>
-• {burger_menu.icon} <b>{burger_menu.name}</b> — {burger_menu.description}
-• {italy_menu.icon}  <b>{italy_menu.name}</b>  — {italy_menu.description}
-• {sushi_menu.icon}  <b>{sushi_menu.name}</b>  — {sushi_menu.description}
-
-🎁 <b>Специальные предложения:</b>
-🔥 Первый заказ — <b>20%</b> скидка
-🚚 Бесплатная доставка от <b>1500 ₽</b>
-⏰ Доставка за <b>30 минут</b> или бесплатно!
-
-👇 <b>Выберите кухню или навигацию:</b>
-"""
-
-    await message.answer_photo(
-        photo="https://via.placeholder.com/1200x400/FF6B6B/FFFFFF?text=Food+Delivery",
-        caption=welcome_text,
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=burger_menu.name, callback_data="show_menu:burger")],
+        [InlineKeyboardButton(text=italy_menu.name, callback_data="show_menu:italy")],
+        [InlineKeyboardButton(text=sushi_menu.name, callback_data="show_menu:sushi")],
+        [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart")]
+    ])
+    
+    await message.answer(
+        f"👋 <b>Привет, {user.first_name}!</b>\n\n"
+        f"Добро пожаловать в ресторанный бот!\n"
+        f"Выберите кухню:",
         parse_mode="HTML",
-        reply_markup=builder.as_markup()
+        reply_markup=keyboard
     )
 
-
-@dp.callback_query(lambda c: c.data.startswith("show_menu:"))
-async def show_menu_handler(callback: types.CallbackQuery):
-    _, menu_type = callback.data.split(":", 1)
+# ========== ПОКАЗ МЕНЮ ==========
+@dp.callback_query(lambda call: call.data.startswith("show_menu:"))
+async def show_menu_handler(call: types.CallbackQuery):
+    menu_type = call.data.split(":")[1]
     menu = MENUS.get(menu_type)
-
+    
     if not menu:
-        await callback.answer("Меню не найдено", show_alert=True)
+        await call.answer("❌ Меню не найдено")
         return
-
-    # Здесь должна быть ваша реализация menu.get_menu_text()
-    # Для примера:
-    menu_items_text = "\n".join(f"• {item['name']} — {item['price']} ₽" for item in menu.items[:8])
-
-    text = f"""
-{menu.icon * 3} <b>{menu.name.upper()}</b> {menu.icon * 3}
-
-📋 <b>КАТАЛОГ БЛЮД</b>
-━━━━━━━━━━━━━━━━━━━━
-{menu_items_text}
-
-💰 Цены от: <b>{min(i['price'] for i in menu.items)} ₽</b>
-⏱️ Среднее время: <b>~15–35 мин</b>
-⭐ Рейтинг: <b>★★★★.8</b>
-"""
-
-    builder = InlineKeyboardBuilder()
-
-    for item in menu.items:
-        emoji = "🍽️"  # здесь ваша логика выбора эмодзи
-        builder.add(InlineKeyboardButton(
-            text=f"{emoji} {item['name']} · {item['price']}₽",
-            callback_data=f"menu_item:{menu_type}:{item['id']}"
-        ))
-
-    builder.adjust(1)
-
-    builder.row(
-        InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_main"),
-        InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart")
+    
+    await call.message.edit_text(
+        menu.get_menu_text(),
+        parse_mode="HTML",
+        reply_markup=menu.get_keyboard()
     )
+    await call.answer(f"✅ {menu.name}")
 
-    await callback.message.edit_text(
+# ========== ПОКАЗ БЛЮДА ==========
+@dp.callback_query(lambda call: call.data.startswith("menu_item:"))
+async def show_item_handler(call: types.CallbackQuery):
+    try:
+        _, menu_type, item_id = call.data.split(":")
+        menu = MENUS.get(menu_type)
+        
+        if not menu:
+            await call.answer("❌ Меню не найдено")
+            return
+        
+        item = menu.get_item_details(item_id)
+        if not item:
+            await call.answer("❌ Блюдо не найдено")
+            return
+        
+        # Формируем текст
+        text = f"""
+<b>{item['name']}</b>
+
+{item['description']}
+
+💰 <b>Цена:</b> {item['price']}₽
+⚖️ <b>Вес:</b> {item['weight']}г
+⏱️ <b>Приготовление:</b> {item['cooking_time']} мин
+"""
+        if 'calories' in item:
+            text += f"🔥 <b>Калории:</b> {item['calories']} ккал\n"
+        
+        # Создаем клавиатуру
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Добавить в корзину", callback_data=f"add_to_cart:{menu_type}:{item_id}")],
+            [InlineKeyboardButton(text="◀️ Назад", callback_data=f"show_menu:{menu_type}")]
+        ])
+        
+        await call.message.edit_text(
+            text,
+            parse_mode="HTML",
+            reply_markup=keyboard
+        )
+        await call.answer()
+        
+    except Exception as e:
+        await call.answer("❌ Ошибка")
+        print(f"Error: {e}")
+
+# ========== ДОБАВЛЕНИЕ В КОРЗИНУ ==========
+@dp.callback_query(lambda call: call.data.startswith("add_to_cart:"))
+async def add_to_cart_handler(call: types.CallbackQuery):
+    try:
+        _, menu_type, item_id = call.data.split(":")
+        menu = MENUS.get(menu_type)
+        item = menu.get_item_details(item_id) if menu else None
+        
+        if not item:
+            await call.answer("❌ Блюдо не найдено")
+            return
+        
+        user_id = call.from_user.id
+        
+        # Инициализируем корзину
+        if user_id not in user_carts:
+            user_carts[user_id] = []
+        
+        # Добавляем товар
+        user_carts[user_id].append({
+            'name': item['name'],
+            'price': item['price'],
+            'quantity': 1,
+            'total': item['price']
+        })
+        
+        await call.answer(f"✅ {item['name']} добавлен в корзину!")
+        
+        # Возвращаемся к меню
+        await show_menu_handler(call)
+        
+    except Exception as e:
+        await call.answer("❌ Ошибка")
+        print(f"Error: {e}")
+
+# ========== ПОКАЗ КОРЗИНЫ ==========
+@dp.callback_query(lambda call: call.data == "show_cart")
+async def show_cart_handler(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    cart_items = user_carts.get(user_id, [])
+    
+    if not cart_items:
+        text = "🛒 <b>Ваша корзина пуста</b>\n\nДобавьте товары из меню!"
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🍽️ К меню", callback_data="back_to_main")]
+        ])
+    else:
+        # Формируем текст корзины
+        text = "🛒 <b>Ваша корзина</b>\n\n"
+        total = 0
+        
+        for idx, item in enumerate(cart_items, 1):
+            text += f"{idx}. {item['name']}\n"
+            text += f"   {item['quantity']} × {item['price']}₽ = {item['total']}₽\n\n"
+            total += item['total']
+        
+        text += f"💵 <b>Итого: {total}₽</b>"
+        
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Оформить заказ", callback_data="checkout")],
+            [InlineKeyboardButton(text="🗑️ Очистить корзину", callback_data="clear_cart")],
+            [InlineKeyboardButton(text="◀️ Продолжить покупки", callback_data="back_to_main")]
+        ])
+    
+    await call.message.edit_text(
         text,
         parse_mode="HTML",
-        reply_markup=builder.as_markup()
+        reply_markup=keyboard
     )
+    await call.answer()
 
-    await callback.answer()
+# ========== ОЧИСТКА КОРЗИНЫ ==========
+@dp.callback_query(lambda call: call.data == "clear_cart")
+async def clear_cart_handler(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    if user_id in user_carts:
+        user_carts[user_id] = []
+    await show_cart_handler(call)
+    await call.answer("🗑️ Корзина очищена")
 
+# ========== ВОЗВРАТ НА ГЛАВНУЮ ==========
+@dp.callback_query(lambda call: call.data == "back_to_main")
+async def back_to_main_handler(call: types.CallbackQuery):
+    user = call.from_user
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=burger_menu.name, callback_data="show_menu:burger")],
+        [InlineKeyboardButton(text=italy_menu.name, callback_data="show_menu:italy")],
+        [InlineKeyboardButton(text=sushi_menu.name, callback_data="show_menu:sushi")],
+        [InlineKeyboardButton(text="🛒 Корзина", callback_data="show_cart")]
+    ])
+    
+    await call.message.edit_text(
+        f"👋 <b>Привет, {user.first_name}!</b>\n\n"
+        f"Выберите кухню:",
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
+    await call.answer()
 
-@dp.callback_query(lambda c: c.data.startswith("add_to_cart:"))
-async def add_to_cart_handler(callback: types.CallbackQuery):
-    try:
-        _, menu_type, item_id, qty_str = callback.data.split(":")
-        qty = int(qty_str)
-    except:
-        await callback.answer("Ошибка формата", show_alert=True)
+# ========== ОФОРМЛЕНИЕ ЗАКАЗА ==========
+@dp.callback_query(lambda call: call.data == "checkout")
+async def checkout_handler(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    cart_items = user_carts.get(user_id, [])
+    
+    if not cart_items:
+        await call.answer("❌ Корзина пуста")
         return
-
-    # Дальше ваша логика добавления в корзину...
-    # user_carts[callback.from_user.id] = ...
-
-    await callback.answer(f"Добавлено {qty} шт ✓", show_alert=True)
-
-
-@dp.callback_query(lambda c: c.data == "back_to_main")
-async def back_to_main(callback: types.CallbackQuery):
-    # Здесь логика возврата на главное меню
-    # Можно просто вызвать start() но с edit
-    await callback.message.edit_text(
-        "Возвращаемся на главную...",
-        parse_mode="HTML"
+    
+    # Формируем заказ
+    order_text = "✅ <b>Заказ оформлен!</b>\n\n"
+    total = 0
+    
+    for item in cart_items:
+        order_text += f"• {item['name']} - {item['price']}₽\n"
+        total += item['price']
+    
+    order_text += f"\n💵 <b>Итого: {total}₽</b>\n\n"
+    order_text += "Спасибо за заказ! Ожидайте звонка оператора."
+    
+    # Очищаем корзину
+    user_carts[user_id] = []
+    
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🍽️ Сделать новый заказ", callback_data="back_to_main")]
+    ])
+    
+    await call.message.edit_text(
+        order_text,
+        parse_mode="HTML",
+        reply_markup=keyboard
     )
-    await asyncio.sleep(0.6)
-    await start(callback.message)  # не идеально, но для прототипа сойдёт
+    await call.answer("✅ Заказ принят!")
 
+# ========== ОБРАБОТКА ОСТАЛЬНЫХ КОМАНД ==========
+@dp.message()
+async def handle_other_messages(message: types.Message):
+    await message.answer(
+        "👋 Используйте кнопки меню или команду /start",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏠 Главное меню", callback_data="back_to_main")]
+        ])
+    )
 
+# ========== ЗАПУСК БОТА ==========
 async def main():
-    print("🚀 Food Delivery Bot запущен...")
-    await dp.start_polling(bot, allowed_updates=types.default_allowed_updates)
-
+    print("=" * 50)
+    print("🚀 Бот запускается...")
+    print(f"📱 Токен: {BOT_TOKEN[:10]}...")
+    print("🍽️  Доступные кухни:")
+    for key, value in CUISINES.items():
+        print(f"   • {key}: {value}")
+    print("=" * 50)
+    
+    try:
+        await dp.start_polling(bot)
+    except Exception as e:
+        print(f"❌ Критическая ошибка: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
