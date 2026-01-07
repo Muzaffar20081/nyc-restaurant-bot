@@ -1,6 +1,10 @@
-BOT_TOKEN = "8244967100:AAFG7beMN450dqwzlqQDjnFJoHxWl0qjXAE"
+# config.py
+BOT_TOKEN = "8244967100:AAF67beMM450dqwz1q0DjnFJohkMl0qjXAE"
+
+# Кухни для меню
 CUISINES = {
-    "burgers": "🍔 Бургеры NYC",
-    "italy": "🍝 Итальянская",
+    "burger": "🍔 Бургеры NYC",
+    "italy": "🍕 Итальянская",
     "sushi": "🍣 Суши"
 }
+
