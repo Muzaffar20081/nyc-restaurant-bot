@@ -1,18 +1,18 @@
 # menus/__init__.py
 from .burger_menu import BurgerMenu
-from .italy_menu import ItalyMenu
+from .pizza_menu import PizzaMenu
 from .sushi_menu import SushiMenu
 
 # Создаем экземпляры меню
 burger_menu = BurgerMenu()
-italy_menu = ItalyMenu()
+pizza_menu = PizzaMenu()
 sushi_menu = SushiMenu()
 
-# Словарь для быстрого доступа
-MENUS = {
-    'burger': burger_menu,
-    'italy': italy_menu,
-    'sushi': sushi_menu
+# Словарь всех меню
+ALL_MENUS = {
+    "burger": burger_menu,
+    "pizza": pizza_menu,
+    "sushi": sushi_menu,
 }
 
-__all__ = ['burger_menu', 'italy_menu', 'sushi_menu', 'MENUS']
+__all__ = ["burger_menu", "pizza_menu", "sushi_menu", "ALL_MENUS"]
